@@ -5,9 +5,14 @@ export const componentMetaParser = (designer: any) => {
     return {
       init() {
         const { material } = ctx;
+
+        // 监听资产包变化的事件
+        // 当资产包中新增加了组件,能够及时更新渲染成组件到 designer 中
         material.onChangeAssets(() => {
           const assets = material.getAssets();
           const { components = [] } = assets;
+
+          // 实现了组件元数据的构建和管理功能
           designer.buildComponentMetasMap(components);
         });
       },

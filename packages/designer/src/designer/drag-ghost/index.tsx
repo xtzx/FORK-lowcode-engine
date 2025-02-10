@@ -8,98 +8,103 @@ import { IPublicTypeI18nData, IPublicTypeNodeSchema, IPublicModelDragObject } fr
 
 type offBinding = () => any;
 
+/**
+ * 主要用于在拖拽操作中提供一个视觉反馈。这个组件显示了被拖拽元素的“幽灵”或“影子”版本，帮助用户在拖拽过程中预览拖拽效果。
+ */
 @observer
-export default class DragGhost extends Component<{ designer: Designer }> {
-  private dispose: offBinding[] = [];
+export default class DragGhost extends Component<{designer: Designer}> {
+    private dispose: offBinding[] = [];
 
-  @obx.ref private titles: (string | IPublicTypeI18nData | ReactElement)[] | null = null;
+    @obx.ref private titles: Array<string | IPublicTypeI18nData | ReactElement> | null = null;
 
-  @obx.ref private x = 0;
+    @obx.ref private x = 0;
 
-  @obx.ref private y = 0;
+    @obx.ref private y = 0;
 
-  @obx private isAbsoluteLayoutContainer = false;
+    @obx private isAbsoluteLayoutContainer = false;
 
-  private dragon = this.props.designer.dragon;
+    private dragon = this.props.designer.dragon;
 
-  constructor(props: any) {
-    super(props);
-    makeObservable(this);
-    this.dispose = [
-      this.dragon.onDragstart(e => {
-        if (e.originalEvent.type.slice(0, 4) === 'drag') {
-          return;
+    constructor(props: any) {
+        super(props);
+        makeObservable(this);
+        this.dispose = [
+            // this.dragon.onDragstart((e) => {
+            //   if (e.originalEvent.type.slice(0, 4) === 'drag') {
+            //     return;
+            //   }
+            //   this.titles = this.getTitles(e.dragObject);
+            //   this.x = e.globalX;
+            //   this.y = e.globalY;
+            // }),
+            // this.dragon.onDrag((e) => {
+            //   this.x = e.globalX;
+            //   this.y = e.globalY;
+            //   if (isSimulatorHost(e.sensor)) {
+            //     const container = e.sensor.getDropContainer(e);
+            //     if (container?.container.componentMeta.advanced.isAbsoluteLayoutContainer) {
+            //       this.isAbsoluteLayoutContainer = true;
+            //       return;
+            //     }
+            //   }
+            //   this.isAbsoluteLayoutContainer = false;
+            // }),
+            // this.dragon.onDragend(() => {
+            //   this.titles = null;
+            //   this.x = 0;
+            //   this.y = 0;
+            // }),
+        ];
+    }
+
+    getTitles(dragObject: IPublicModelDragObject) {
+        if (isDragNodeObject(dragObject)) {
+            return dragObject.nodes.map((node) => node.title);
         }
-        this.titles = this.getTitles(e.dragObject);
-        this.x = e.globalX;
-        this.y = e.globalY;
-      }),
-      this.dragon.onDrag(e => {
-        this.x = e.globalX;
-        this.y = e.globalY;
-        if (isSimulatorHost(e.sensor)) {
-          const container = e.sensor.getDropContainer(e);
-          if (container?.container.componentMeta.advanced.isAbsoluteLayoutContainer) {
-            this.isAbsoluteLayoutContainer = true;
-            return;
-          }
+
+        const dataList = Array.isArray(dragObject.data) ? dragObject.data : [dragObject.data];
+
+        return dataList.map(
+            (item: IPublicTypeNodeSchema, i) => this.props.designer.getComponentMeta(item.componentName).title,
+        );
+    }
+
+    componentWillUnmount() {
+        if (this.dispose) {
+            this.dispose.forEach((off) => off());
         }
-        this.isAbsoluteLayoutContainer = false;
-      }),
-      this.dragon.onDragend(() => {
-        this.titles = null;
-        this.x = 0;
-        this.y = 0;
-      }),
-    ];
-  }
-
-  getTitles(dragObject: IPublicModelDragObject) {
-    if (isDragNodeObject(dragObject)) {
-      return dragObject.nodes.map((node) => node.title);
     }
 
-    const dataList = Array.isArray(dragObject.data) ? dragObject.data : [dragObject.data];
-
-    return dataList.map((item: IPublicTypeNodeSchema, i) => (this.props.designer.getComponentMeta(item.componentName).title));
-  }
-
-  componentWillUnmount() {
-    if (this.dispose) {
-      this.dispose.forEach(off => off());
-    }
-  }
-
-  renderGhostGroup() {
-    return this.titles?.map((title, i) => {
-      const ghost = (
-        <div className="lc-ghost" key={i}>
-          <Title title={title} />
-        </div>
-      );
-      return ghost;
-    });
-  }
-
-  render() {
-    if (!this.titles || !this.titles.length) {
-      return null;
+    renderGhostGroup() {
+        return this.titles?.map((title, i) => {
+            const ghost = (
+              <div className="lc-ghost" key={i}>
+                <Title title={title} />
+              </div>
+            );
+            return ghost;
+        });
     }
 
-    if (this.isAbsoluteLayoutContainer) {
-      return null;
-    }
+    render() {
+        if (!this.titles || !this.titles.length) {
+            return null;
+        }
 
-    return (
-      <div
-        className="lc-ghost-group"
-        style={{
-          left: this.x,
-          top: this.y,
-        }}
-      >
-        {this.renderGhostGroup()}
-      </div>
-    );
-  }
+        if (this.isAbsoluteLayoutContainer) {
+            return null;
+        }
+
+        return (
+          <div
+            className="lc-ghost-group"
+            style={{
+                    left: this.x,
+                    top: this.y,
+                }}
+          >
+            {this.renderGhostGroup()}
+          </div>
+        );
+    }
 }

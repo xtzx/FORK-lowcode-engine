@@ -1,66 +1,78 @@
-import React, { Component, PureComponent, createElement, createContext, forwardRef, ReactInstance, ContextType } from 'react';
-import ReactDOM from 'react-dom';
-import {
-  adapter,
-  pageRendererFactory,
-  componentRendererFactory,
-  blockRendererFactory,
-  addonRendererFactory,
-  tempRendererFactory,
-  rendererFactory,
-  types,
-} from '@alilc/lowcode-renderer-core';
+// 能否去掉
 import ConfigProvider from '@alifd/next/lib/config-provider';
 
+import React, {
+    Component,
+    PureComponent,
+    createElement,
+    createContext,
+    forwardRef,
+    ReactInstance,
+    ContextType,
+} from 'react';
+import ReactDOM from 'react-dom';
+import {
+    adapter,
+    pageRendererFactory,
+    componentRendererFactory,
+    blockRendererFactory,
+    addonRendererFactory,
+    tempRendererFactory,
+    rendererFactory,
+    types,
+} from '../../renderer-core/src';
+
+// 下面代码意义不明
 window.React = React;
 (window as any).ReactDom = ReactDOM;
 
 adapter.setRuntime({
-  Component,
-  PureComponent,
-  createContext,
-  createElement,
-  forwardRef,
-  findDOMNode: ReactDOM.findDOMNode,
+    Component,
+    PureComponent,
+    createContext,
+    createElement,
+    forwardRef,
+    findDOMNode: ReactDOM.findDOMNode,
 });
 
 adapter.setRenderers({
-  PageRenderer: pageRendererFactory(),
-  ComponentRenderer: componentRendererFactory(),
-  BlockRenderer: blockRendererFactory(),
-  AddonRenderer: addonRendererFactory(),
-  TempRenderer: tempRendererFactory(),
-  DivRenderer: blockRendererFactory(),
+    PageRenderer: pageRendererFactory(),
+    ComponentRenderer: componentRendererFactory(),
+    BlockRenderer: blockRendererFactory(),
+    AddonRenderer: addonRendererFactory(),
+    TempRenderer: tempRendererFactory(),
+    DivRenderer: blockRendererFactory(),
 });
 
 adapter.setConfigProvider(ConfigProvider);
 
+/**
+ * 通过 rendererFactory 实现渲染
+ */
 function factory(): types.IRenderComponent {
-  const Renderer = rendererFactory();
-  return class ReactRenderer extends Renderer implements Component {
-    readonly props: types.IRendererProps;
+    const Renderer = rendererFactory();
 
-    context: ContextType<any>;
+    return class ReactRenderer extends Renderer implements Component {
+        readonly props: types.IRendererProps;
 
-    setState: (
-      state: types.IRendererState,
-      callback?: () => void,
-    ) => void;
+        context: ContextType<any>;
 
-    forceUpdate: (callback?: () => void) => void;
+        setState: (state: types.IRendererState, callback?: () => void) => void;
 
-    refs: {
-      [key: string]: ReactInstance;
+        forceUpdate: (callback?: () => void) => void;
+
+        refs: {
+            [key: string]: ReactInstance;
+        };
+
+        constructor(props: types.IRendererProps, context: ContextType<any>) {
+            super(props, context);
+        }
+
+        isValidComponent(obj: any) {
+            return obj?.prototype?.isReactComponent || obj?.prototype instanceof Component;
+        }
     };
-
-    constructor(props: types.IRendererProps, context: ContextType<any>) {
-      super(props, context);
-    }
-
-    isValidComponent(obj: any) {
-      return obj?.prototype?.isReactComponent || obj?.prototype instanceof Component;
-    }
-  };
 }
 
 export default factory();

@@ -113,9 +113,13 @@ const defaultSimulatorUrl = (() => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_, prefix = '', dev] = /^(.+?)(\/js)?\/?$/.exec(publicPath) || [];
   if (dev) {
+    // http://localhost:5555/js/ReactSimulatorRenderer.js
+    // http://localhost:5555/css/ReactSimulatorRenderer.css
     urls = [
       `${prefix}/css/react-simulator-renderer.css`,
+      // `${prefix}/css/ReactSimulatorRenderer.css`,
       `${prefix}/js/react-simulator-renderer.js`,
+      // `${prefix}/js/ReactSimulatorRenderer.js`,
     ];
   } else if (process.env.NODE_ENV === 'production') {
     urls = [`${prefix}/react-simulator-renderer.css`, `${prefix}/react-simulator-renderer.js`];

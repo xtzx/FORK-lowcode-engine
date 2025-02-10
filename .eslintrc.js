@@ -8,6 +8,7 @@ module.exports = {
     'react/no-multi-comp': 0,
     'no-unused-expressions': 0,
     'implicit-arrow-linebreak': 1,
+    'jsx-indent': 0,
     'no-nested-ternary': 1,
     'no-mixed-operators': 1,
     '@typescript-eslint/ban-types': 1,
