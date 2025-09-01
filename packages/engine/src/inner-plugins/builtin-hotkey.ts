@@ -4,7 +4,7 @@
  * 定义和处理低代码编辑器中的快捷键操作。
  * 些快捷键操作允许用户通过键盘快捷方式执行常见任务，如节点的移动、选择和编辑等。
  */
-import {isFormEvent, isNodeSchema, isNode} from '../../../utils/src';
+import { isFormEvent, isNodeSchema, isNode } from '../../../utils/src';
 import {
     IPublicModelPluginContext,
     IPublicEnumTransformStage,
@@ -61,8 +61,8 @@ function insertChildren(
 function getSuitableInsertion(
     pluginContext: IPublicModelPluginContext,
     insertNode?: IPublicModelNode | IPublicTypeNodeSchema | IPublicTypeNodeSchema[],
-): {target: IPublicModelNode; index?: number} | null {
-    const {project, material} = pluginContext;
+): { target: IPublicModelNode; index?: number } | null {
+    const { project, material } = pluginContext;
     const activeDoc = project.currentDocument;
     if (!activeDoc) {
         return null;
@@ -100,7 +100,7 @@ function getSuitableInsertion(
         return null;
     }
 
-    return {target, index};
+    return { target, index };
 }
 
 /* istanbul ignore next */
@@ -112,7 +112,7 @@ function getNextForSelect(next: IPublicModelNode | null, head?: any, parent?: IP
 
         let ret;
         if (next.isContainerNode) {
-            const {children} = next;
+            const { children } = next;
             if (children && !children.isEmptyNode) {
                 ret = getNextForSelect(children.get(0));
                 if (ret) {
@@ -139,7 +139,7 @@ function getPrevForSelect(prev: IPublicModelNode | null, head?: any, parent?: IP
     if (prev) {
         let ret;
         if (!head && prev.isContainerNode) {
-            const {children} = prev;
+            const { children } = prev;
             const lastChild = children && !children.isEmptyNode ? children.get(children.size - 1) : null;
 
             ret = getPrevForSelect(lastChild);
@@ -166,7 +166,7 @@ function getPrevForSelect(prev: IPublicModelNode | null, head?: any, parent?: IP
 }
 
 function getSuitablePlaceForNode(targetNode: IPublicModelNode, node: IPublicModelNode, ref: any): any {
-    const {document} = targetNode;
+    const { document } = targetNode;
     if (!document) {
         return null;
     }
@@ -179,12 +179,12 @@ function getSuitablePlaceForNode(targetNode: IPublicModelNode, node: IPublicMode
     const focusNode = document?.focusNode;
     // 如果节点是模态框，插入到根节点下
     if (node?.componentMeta?.isModal) {
-        return {container: focusNode, ref};
+        return { container: focusNode, ref };
     }
 
     if (!ref && focusNode && targetNode.contains(focusNode)) {
         if (document.checkNesting(focusNode, dragNodeObject)) {
-            return {container: focusNode};
+            return { container: focusNode };
         }
 
         return null;
@@ -202,11 +202,11 @@ function getSuitablePlaceForNode(targetNode: IPublicModelNode, node: IPublicMode
         })[0];
 
         if (dropElement) {
-            return {container: dropElement, ref};
+            return { container: dropElement, ref };
         }
 
         if (document.checkNesting(targetNode, dragNodeObject)) {
-            return {container: targetNode, ref};
+            return { container: targetNode, ref };
         }
 
         return null;
@@ -214,12 +214,12 @@ function getSuitablePlaceForNode(targetNode: IPublicModelNode, node: IPublicMode
 
     if (targetNode.isContainerNode) {
         if (document.checkNesting(targetNode, dragNodeObject)) {
-            return {container: targetNode, ref};
+            return { container: targetNode, ref };
         }
     }
 
     if (targetNode.parent) {
-        return getSuitablePlaceForNode(targetNode.parent, node, {index: targetNode.index});
+        return getSuitablePlaceForNode(targetNode.parent, node, { index: targetNode.index });
     }
 
     return null;
@@ -228,10 +228,10 @@ function getSuitablePlaceForNode(targetNode: IPublicModelNode, node: IPublicMode
 export const builtinHotkey = (ctx: IPublicModelPluginContext) => {
     return {
         init() {
-            const {hotkey, project, logger, canvas} = ctx;
+            const { hotkey, project, logger, canvas } = ctx;
 
             // 全局剪贴板实例
-            const {clipboard} = canvas;
+            const { clipboard } = canvas;
 
             // 绑定删除功能
             hotkey.bind(['backspace', 'del'], (e: KeyboardEvent, action) => {
@@ -323,7 +323,7 @@ export const builtinHotkey = (ctx: IPublicModelPluginContext) => {
 
                 // FIXME: clear node.id
 
-                const data = {type: 'nodeSchema', componentsMap, componentsTree};
+                const data = { type: 'nodeSchema', componentsMap, componentsTree };
 
                 // 给剪贴板赋值
                 clipboard.setData(data);
@@ -351,9 +351,9 @@ export const builtinHotkey = (ctx: IPublicModelPluginContext) => {
                     return;
                 }
                 /* istanbul ignore next */
-                clipboard.waitPasteData(e, ({componentsTree}) => {
+                clipboard.waitPasteData(e, ({ componentsTree }) => {
                     if (componentsTree) {
-                        const {target, index} = getSuitableInsertion(ctx, componentsTree) || {};
+                        const { target, index } = getSuitableInsertion(ctx, componentsTree) || {};
                         if (!target) {
                             return;
                         }
