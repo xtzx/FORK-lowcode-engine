@@ -426,7 +426,7 @@ export const nodeCommand: IPublicTypePlugin = (ctx: IPublicModelPluginContext) =
             throw new Error(`Can not find node '${nodeId}'.`);
           }
 
-          Object.keys(props).forEach(key => {
+          Object.keys(props).forEach((key) => {
             node.setPropValue(key, props[key]);
           });
         },
@@ -461,7 +461,7 @@ export const nodeCommand: IPublicTypePlugin = (ctx: IPublicModelPluginContext) =
             throw new Error(`Can not find node '${nodeId}'.`);
           }
 
-          propNames.forEach(key => {
+          propNames.forEach((key) => {
             node.props?.getProp(key)?.remove();
           });
         },

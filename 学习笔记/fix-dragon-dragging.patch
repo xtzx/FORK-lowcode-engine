@@ -1,0 +1,83 @@
+# 拖拽组件报错修复补丁
+# 应用方法：将以下代码替换 dragon.ts 中对应的部分
+
+## 修复位置1：第 177 行附近
+## 原代码：
+# const newBie = !isDragNodeObject(dragObject);
+
+## 修改为：
+const newBie = !dragObject || !isDragNodeObject(dragObject);
+
+## 修复位置2：第 251-259 行附近
+## 原代码：
+# if (isRGL && !newBie) {
+#     // 禁止被拖拽元素的阻断
+#     const nodeInst = dragObject.nodes[0].getDOMNode();
+#     if (nodeInst && nodeInst.style) {
+#         this.nodeInstPointerEvents = true;
+#         nodeInst.style.pointerEvents = 'none';
+#     }
+# }
+
+## 修改为：
+if (isRGL) {
+    // 添加防御性检查
+    if (!newBie && dragObject?.nodes?.[0]) {
+        // 禁止被拖拽元素的阻断
+        const nodeInst = dragObject.nodes[0].getDOMNode();
+        if (nodeInst && nodeInst.style) {
+            this.nodeInstPointerEvents = true;
+            nodeInst.style.pointerEvents = 'none';
+        }
+    }
+}
+
+## 修复位置3：第 272 行附近
+## 原代码：
+# node: locateEvent.dragObject?.nodes[0],
+
+## 保持不变（已经有可选链）
+
+## 修复位置4：第 343-349 行附近（over 函数内）
+## 原代码：
+# const over = (e?: any) => {
+#     // 禁止被拖拽元素的阻断
+#     if (this.nodeInstPointerEvents) {
+#         const nodeInst = dragObject.nodes[0].getDOMNode();
+#         if (nodeInst && nodeInst.style) {
+#             nodeInst.style.pointerEvents = '';
+#         }
+#     }
+
+## 修改为：
+const over = (e?: any) => {
+    // 禁止被拖拽元素的阻断
+    if (this.nodeInstPointerEvents) {
+        // 添加防御性检查
+        if (dragObject?.nodes?.[0]) {
+            const nodeInst = dragObject.nodes[0].getDOMNode();
+            if (nodeInst && nodeInst.style) {
+                nodeInst.style.pointerEvents = '';
+            }
+        }
+        this.nodeInstPointerEvents = false;
+    }
+
+## 修复位置5：第 424-430 行附近（createLocateEvent 函数）
+## 原代码：
+# const createLocateEvent = (e: MouseEvent | DragEvent): ILocateEvent => {
+#     const evt: any = {
+#         type: 'LocateEvent',
+#         dragObject,
+#         target: e.target,
+#         originalEvent: e,
+#     };
+
+## 修改为：
+const createLocateEvent = (e: MouseEvent | DragEvent): ILocateEvent => {
+    const evt: any = {
+        type: 'LocateEvent',
+        dragObject: dragObject || null,  // 确保不是 undefined
+        target: e.target,
+        originalEvent: e,
+    };

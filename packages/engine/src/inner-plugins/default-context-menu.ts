@@ -4,7 +4,7 @@
  * 主要负责定义和管理低代码编辑器中的默认上下文菜单（右键菜单）。
  * 通过插件上下文 (IPublicModelPluginContext) 提供的接口，添加和配置各种上下文菜单项，以支持节点的选择、复制、粘贴、删除等操作。
  */
-import {Message} from '@alifd/next';
+import { Message } from '@alifd/next';
 
 import {
     IPublicEnumContextMenuType,
@@ -15,12 +15,12 @@ import {
     IPublicTypeDragNodeDataObject,
     IPublicTypeNodeSchema,
 } from '../../../types/src';
-import {isProjectSchema} from '../../../utils/src';
-import {intl} from '../locale';
+import { isProjectSchema } from '../../../utils/src';
+import { intl } from '../locale';
 
 function getNodesSchema(nodes: IPublicModelNode[]) {
     const componentsTree = nodes.map((node) => node?.exportSchema(IPublicEnumTransformStage.Clone));
-    const data = {type: 'nodeSchema', componentsMap: {}, componentsTree};
+    const data = { type: 'nodeSchema', componentsMap: {}, componentsTree };
     return data;
 }
 
@@ -50,9 +50,9 @@ async function getClipboardText(): Promise<IPublicTypeNodeSchema[]> {
 }
 
 export const defaultContextMenu = (ctx: IPublicModelPluginContext) => {
-    const {material, canvas, common} = ctx;
-    const {clipboard} = canvas;
-    const {intl: utilsIntl} = common.utils;
+    const { material, canvas, common } = ctx;
+    const { clipboard } = canvas;
+    const { intl: utilsIntl } = common.utils;
 
     return {
         init() {
@@ -92,7 +92,7 @@ export const defaultContextMenu = (ctx: IPublicModelPluginContext) => {
                     if (!node) {
                         return;
                     }
-                    const {document: doc, parent, index} = node;
+                    const { document: doc, parent, index } = node;
                     const data = getNodesSchema(nodes);
                     clipboard.setData(data);
 
@@ -140,7 +140,7 @@ export const defaultContextMenu = (ctx: IPublicModelPluginContext) => {
                     }
 
                     const node = nodes[0];
-                    const {document: doc, parent, index} = node;
+                    const { document: doc, parent, index } = node;
 
                     try {
                         const nodeSchema = await getClipboardText();
@@ -194,7 +194,7 @@ export const defaultContextMenu = (ctx: IPublicModelPluginContext) => {
                     if (!node) {
                         return;
                     }
-                    const {document: doc} = node;
+                    const { document: doc } = node;
 
                     try {
                         const nodeSchema = await getClipboardText();

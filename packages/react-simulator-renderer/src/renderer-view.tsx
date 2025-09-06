@@ -46,12 +46,22 @@ const originCloneElement = window.React.cloneElement;
   return originCloneElement(child, props, ...rest);
 };
 
+/**
+ * 模拟器渲染视图主组件
+ * 作为渲染器的根组件，负责：
+ * 1. 设置路由系统
+ * 2. 应用全局布局
+ * 3. 渲染路由内容
+ */
 export default class SimulatorRendererView extends Component<{ rendererContainer: SimulatorRendererContainer }> {
   render() {
     const { rendererContainer } = this.props;
     return (
+      // 使用内存路由管理多文档切换
       <Router history={rendererContainer.history}>
+        {/* Layout 提供全局布局容器 */}
         <Layout rendererContainer={rendererContainer}>
+          {/* Routes 根据路由渲染对应文档 */}
           <Routes rendererContainer={rendererContainer} />
         </Layout>
       </Router>
@@ -59,6 +69,11 @@ export default class SimulatorRendererView extends Component<{ rendererContainer
   }
 }
 
+/**
+ * 路由配置组件
+ * 为每个文档实例创建对应的路由
+ * 使用 MobX observer 响应文档变化
+ */
 @observer
 export class Routes extends Component<{ rendererContainer: SimulatorRendererContainer }> {
   render() {
@@ -125,12 +140,19 @@ class Layout extends Component<{ rendererContainer: SimulatorRendererContainer }
   }
 }
 
+/**
+ * 核心渲染组件
+ * 负责将单个文档的 Schema 渲染为 React 组件树
+ * 使用 LowCodeRenderer 完成实际的 Schema 转换
+ */
 @observer
 class Renderer extends Component<{
   rendererContainer: SimulatorRendererContainer;
   documentInstance: DocumentInstance;
 }> {
+  // 渲染开始时间，用于性能监控
   startTime: number | null = null;
+  // Schema 是否变化标记，用于优化渲染
   schemaChangedSymbol = false;
 
   componentDidUpdate() {
@@ -167,7 +189,9 @@ class Renderer extends Component<{
     const { container, document } = documentInstance;
     const { designMode, device, locale } = container;
     const messages = container.context?.utils?.i18n?.messages || {};
+    // 记录渲染开始时间
     this.startTime = Date.now();
+    // 重置 Schema 变化标记
     this.schemaChangedSymbol = false;
 
     if (!container.autoRender || isRendererDetached()) {
@@ -177,25 +201,27 @@ class Renderer extends Component<{
     const { intl } = createIntl(locale);
 
     return (
+      // LowCodeRenderer 是核心渲染器，负责将 Schema 转换为 React 组件
       <LowCodeRenderer
-        locale={locale}
-        messages={messages}
-        schema={documentInstance.schema}
-        components={container.components}
-        appHelper={container.context}
-        designMode={designMode}
-        device={device}
-        documentId={document.id}
-        suspended={renderer.suspended}
-        self={renderer.scope}
-        getSchemaChangedSymbol={this.getSchemaChangedSymbol}
-        setSchemaChangedSymbol={this.setSchemaChangedSymbol}
-        getNode={(id: string) => documentInstance.getNode(id) as Node}
-        rendererName="PageRenderer"
-        thisRequiredInJSE={host.thisRequiredInJSE}
-        notFoundComponent={host.notFoundComponent}
-        faultComponent={host.faultComponent}
-        faultComponentMap={host.faultComponentMap}
+        locale={locale}                                    // 语言设置
+        messages={messages}                                // 国际化消息
+        schema={documentInstance.schema}                   // 页面 Schema
+        components={container.components}                  // 组件库
+        appHelper={container.context}                      // 应用上下文（utils、constants 等）
+        designMode={designMode}                            // 设计模式（design/preview）
+        device={device}                                    // 设备类型
+        documentId={document.id}                           // 文档 ID
+        suspended={renderer.suspended}                     // 是否暂停渲染
+        self={renderer.scope}                              // 作用域
+        getSchemaChangedSymbol={this.getSchemaChangedSymbol}  // 获取 Schema 变化标记
+        setSchemaChangedSymbol={this.setSchemaChangedSymbol}  // 设置 Schema 变化标记
+        getNode={(id: string) => documentInstance.getNode(id) as Node}  // 获取节点方法
+        rendererName="PageRenderer"                        // 渲染器名称
+        thisRequiredInJSE={host.thisRequiredInJSE}        // JSExpression 中是否需要 this
+        notFoundComponent={host.notFoundComponent}         // 组件未找到时的备用组件
+        faultComponent={host.faultComponent}               // 组件渲染出错时的备用组件
+        faultComponentMap={host.faultComponentMap}         // 特定组件的错误备用组件
+        // 自定义 createElement 方法，用于设计态特殊处理
         customCreateElement={(Component: any, props: any, children: any) => {
           const { __id, ...viewProps } = props;
           viewProps.componentId = __id;

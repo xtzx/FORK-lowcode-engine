@@ -1,5 +1,5 @@
-import {createElement} from 'react';
-import {render, unmountComponentAtNode} from 'react-dom';
+import { createElement } from 'react';
+import { render, unmountComponentAtNode } from 'react-dom';
 import {
     IPublicTypeEngineOptions,
     IPublicModelDocumentModel,
@@ -29,8 +29,8 @@ import {
     PluginPreference,
     IDesigner,
 } from '../../designer/src';
-import {Skeleton as InnerSkeleton, registerDefaults} from '../../editor-skeleton/src';
-import {Workspace as InnerWorkspace, Workbench as WorkSpaceWorkbench, IWorkspace} from '../../workspace/src';
+import { Skeleton as InnerSkeleton, registerDefaults } from '../../editor-skeleton/src';
+import { Workspace as InnerWorkspace, Workbench as WorkSpaceWorkbench, IWorkspace } from '../../workspace/src';
 import {
     Hotkey,
     Project,
@@ -47,18 +47,18 @@ import {
     CommonUI,
     Command,
 } from '../../shell/src';
-import {isPlainObject} from '../../utils/src';
+import { isPlainObject } from '../../utils/src';
 import './modules/live-editing';
 import * as classes from './modules/classes';
 import symbols from './modules/symbols';
-import {componentMetaParser} from './inner-plugins/component-meta-parser';
-import {setterRegistry} from './inner-plugins/setter-registry';
-import {defaultPanelRegistry} from './inner-plugins/default-panel-registry';
-import {shellModelFactory} from './modules/shell-model-factory';
-import {builtinHotkey} from './inner-plugins/builtin-hotkey';
-import {defaultContextMenu} from './inner-plugins/default-context-menu';
-import {CommandPlugin} from '../../plugin-command/src';
-import {OutlinePlugin} from '../../plugin-outline-pane/src';
+import { componentMetaParser } from './inner-plugins/component-meta-parser';
+import { setterRegistry } from './inner-plugins/setter-registry';
+import { defaultPanelRegistry } from './inner-plugins/default-panel-registry';
+import { shellModelFactory } from './modules/shell-model-factory';
+import { builtinHotkey } from './inner-plugins/builtin-hotkey';
+import { defaultContextMenu } from './inner-plugins/default-context-menu';
+import { CommandPlugin } from '../../plugin-command/src';
+import { OutlinePlugin } from '../../plugin-outline-pane/src';
 
 export * from './modules/skeleton-types';
 export * from './modules/designer-types';
@@ -72,12 +72,12 @@ async function registryInnerPlugin(
     // 注册一批内置插件
     const componentMetaParserPlugin = componentMetaParser(designer);
     const defaultPanelRegistryPlugin = defaultPanelRegistry(editor);
-    await plugins.register(OutlinePlugin, {}, {autoInit: true});
+    await plugins.register(OutlinePlugin, {}, { autoInit: true });
     await plugins.register(componentMetaParserPlugin);
     await plugins.register(setterRegistry, {});
     await plugins.register(defaultPanelRegistryPlugin);
     await plugins.register(builtinHotkey);
-    await plugins.register(registerDefaults, {}, {autoInit: true});
+    await plugins.register(registerDefaults, {}, { autoInit: true });
     await plugins.register(defaultContextMenu);
     await plugins.register(CommandPlugin, {});
 
@@ -108,10 +108,10 @@ const innerSkeleton = new InnerSkeleton(editor);
 
 editor.set('skeleton' as any, innerSkeleton);
 
-const designer = new Designer({editor, shellModelFactory});
+const designer = new Designer({ editor, shellModelFactory });
 editor.set('designer' as any, designer);
 
-const {project: innerProject} = designer;
+const { project: innerProject } = designer;
 
 const innerHotkey = new InnerHotkey();
 const hotkey = new Hotkey(innerHotkey);
@@ -131,8 +131,8 @@ editor.set('material', material);
 editor.set('innerHotkey', innerHotkey);
 
 const config = new Config(engineConfig);
-const event = new Event(commonEvent, {prefix: 'common'});
-const logger = new Logger({level: 'warn', bizName: 'common'});
+const event = new Event(commonEvent, { prefix: 'common' });
+const logger = new Logger({ level: 'warn', bizName: 'common' });
 const common = new Common(editor, innerSkeleton);
 const canvas = new Canvas(editor);
 
@@ -148,12 +148,12 @@ const pluginContextApiAssembler: ILowCodePluginContextApiAssembler = {
         context.material = material;
         const eventPrefix = meta?.eventPrefix || 'common';
         const commandScope = meta?.commandScope;
-        context.event = new Event(commonEvent, {prefix: eventPrefix});
+        context.event = new Event(commonEvent, { prefix: eventPrefix });
         context.config = config;
         context.common = common;
         context.canvas = canvas;
         context.plugins = plugins;
-        context.logger = new Logger({level: 'warn', bizName: `plugin:${pluginName}`});
+        context.logger = new Logger({ level: 'warn', bizName: `plugin:${pluginName}` });
         context.workspace = workspace;
         context.commonUI = commonUI;
         context.command = new Command(innerCommand, context as IPublicModelPluginContext, {
@@ -231,7 +231,7 @@ export async function init(
 
     engineConfig.setEngineOptions(engineOptions as any);
 
-    const {Workbench} = common.skeletonCabin;
+    const { Workbench } = common.skeletonCabin;
 
     // 应用级设计模式
     if (options && options.enableWorkspaceMode) {
@@ -269,7 +269,7 @@ export async function init(
 
 export async function destroy() {
     // remove all documents
-    const {documents} = project;
+    const { documents } = project;
     if (Array.isArray(documents) && documents.length > 0) {
         documents.forEach((doc: IPublicModelDocumentModel) => project.removeDocument(doc));
     }

@@ -35,9 +35,19 @@ import { merge } from 'lodash';
 const loader = new AssetLoader();
 configure({ enforceActions: 'never' });
 
+/**
+ * 文档实例类
+ * 管理单个文档（页面）的渲染实例和状态
+ */
 export class DocumentInstance {
+    // 组件实例映射表：nodeId -> ReactInstance[]
+    // 一个节点可能对应多个实例（如循环渲染）
     instancesMap = new Map<string, ReactInstance[]>();
 
+    /**
+     * 获取当前文档的 Schema
+     * 从设计器的文档模型导出渲染态的 Schema
+     */
     get schema(): any {
         return this.document.export(IPublicEnumTransformStage.Render);
     }
@@ -114,6 +124,12 @@ export class DocumentInstance {
         }
     }
 
+    /**
+     * 挂载组件实例
+     * 将 React 组件实例与节点 ID 关联，用于设计器操作
+     * @param id - 节点 ID
+     * @param instance - React 组件实例或 null（卸载）
+     */
     mountInstance(id: string, instance: ReactInstance | null) {
         const docId = this.document.id;
         const { instancesMap } = this;
@@ -187,9 +203,20 @@ export class DocumentInstance {
     }
 }
 
+/**
+ * 模拟器渲染容器
+ * 是整个 iframe 内渲染器的核心管理类
+ * 负责：
+ * 1. 管理多个文档实例
+ * 2. 维护组件库和资源
+ * 3. 与设计器 host 通信
+ * 4. 提供应用上下文
+ */
 export class SimulatorRendererContainer implements BuiltinSimulatorRenderer {
     readonly isSimulatorRenderer = true;
+    // 清理函数集合，用于组件销毁时清理资源
     private disposeFunctions: Array<() => void> = [];
+    // 内存路由，用于多文档切换
     readonly history: MemoryHistory;
 
     @obx.ref private _documentInstances: DocumentInstance[] = [];
@@ -253,7 +280,9 @@ export class SimulatorRendererContainer implements BuiltinSimulatorRenderer {
     private _running = false;
 
     constructor() {
+        // 启用 MobX 响应式
         makeObservable(this);
+        // 同步自动渲染配置
         this.autoRender = host.autoRender;
 
         this.disposeFunctions.push(
@@ -366,8 +395,14 @@ export class SimulatorRendererContainer implements BuiltinSimulatorRenderer {
         });
     }
 
+    /**
+     * 构建组件映射表
+     * 将组件库和组件元数据转换为可用的 React 组件
+     */
     private buildComponents() {
+        // 根据组件库和元数据构建组件
         this._components = buildComponents(this._libraryMap, this._componentsMap, this.createComponent.bind(this));
+        // 添加内置组件（Slot、Leaf 等）
         this._components = {
             ...builtinComponents,
             ...this._components,
@@ -433,6 +468,12 @@ export class SimulatorRendererContainer implements BuiltinSimulatorRenderer {
         cursor.release();
     }
 
+    /**
+     * 创建低代码组件
+     * 将低代码组件的 Schema 转换为可用的 React 组件
+     * @param schema - 低代码组件的 Schema 定义
+     * @returns React 组件类
+     */
     createComponent(schema: IPublicTypeProjectSchema<IPublicTypeComponentSchema>): Component | null {
         const _schema: IPublicTypeProjectSchema<IPublicTypeComponentSchema> = {
             ...schema,
@@ -491,6 +532,10 @@ export class SimulatorRendererContainer implements BuiltinSimulatorRenderer {
         return LowCodeComp;
     }
 
+    /**
+     * 启动渲染器
+     * 创建 DOM 容器并渲染整个应用
+     */
     run() {
         if (this._running) {
             return;

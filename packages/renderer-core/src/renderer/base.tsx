@@ -469,16 +469,22 @@ export default function baseRendererFactory(): IBaseRenderComponent {
             this.__ref = ref;
         };
 
+        /**
+         * 创建 DOM 结构
+         * 根组件的入口方法，开始递归渲染整个组件树
+         */
         __createDom = () => {
             const { __schema, __ctx, __components = {} } = this.props;
-            // merge defaultProps
+            // 合并默认属性和传入属性
             const scopeProps = {
                 ...__schema.defaultProps,
                 ...this.props,
             };
+            // 创建作用域对象，用于表达式解析
             const scope: any = {
                 props: scopeProps,
             };
+            // 设置原型链，使得可以访问 this 上下文
             scope.__proto__ = __ctx || this;
 
             const _children = getSchemaChildren(__schema);
@@ -495,11 +501,23 @@ export default function baseRendererFactory(): IBaseRenderComponent {
         };
 
         /**
-         * 将模型结构转换成react Element
-         * @param originalSchema schema
-         * @param originalScope scope
-         * @param parentInfo 父组件的信息，包含schema和Comp
-         * @param idx 为循环渲染的循环Index
+         * 核心 Schema 转换引擎
+         * 递归地将 Schema 结构转换为 React 虚拟 DOM
+         * 这是整个渲染器的核心方法，处理各种类型的 Schema 节点
+         *
+         * @param originalSchema - 原始 Schema 数据，可以是：
+         *                        - 单个节点对象
+         *                        - 节点数组
+         *                        - JSExpression/JSFunction
+         *                        - 基础类型（string/number/boolean）
+         * @param originalScope - 当前作用域，包含：
+         *                       - props: 组件属性
+         *                       - state: 组件状态
+         *                       - this: 组件实例
+         *                       - 循环变量（item, index 等）
+         * @param parentInfo - 父组件信息，包含父组件的 schema 和 Comp
+         * @param idx - 循环索引，用于生成唯一的 React key
+         * @returns React 元素、元素数组或 null
          */
         __createVirtualDom = (
             originalSchema: IPublicTypeNodeData | IPublicTypeNodeData[] | undefined,
@@ -520,32 +538,50 @@ export default function baseRendererFactory(): IBaseRenderComponent {
             try {
                 const { __appHelper: appHelper, __components: components = {} } = this.props || {};
 
+                // ========== 处理特殊类型的 Schema ==========
+
+                // 1. JSExpression: JavaScript 表达式
+                // 例如: { type: 'JSExpression', value: 'this.state.count + 1' }
                 if (isJSExpression(schema)) {
                     return this.__parseExpression(schema, scope);
                 }
+
+                // 2. 国际化数据
+                // 例如: { type: 'i18n', key: 'app.title' }
                 if (isI18nData(schema)) {
                     return parseI18n(schema, scope);
                 }
+
+                // 3. 插槽
+                // 例如: { type: 'JSSlot', value: [...] }
                 if (isJSSlot(schema)) {
                     return this.__createVirtualDom(schema.value, scope, parentInfo);
                 }
 
+                // ========== 处理基础类型 ==========
+
+                // 4. 字符串：直接作为文本节点返回
                 if (typeof schema === 'string') {
                     return schema;
                 }
 
+                // 5. 数字和布尔值：转换为字符串
                 if (typeof schema === 'number' || typeof schema === 'boolean') {
                     return String(schema);
                 }
 
+                // 6. 数组：递归处理每个元素
                 if (Array.isArray(schema)) {
+                    // 优化：只有一个元素时直接返回
                     if (schema.length === 1) {
                         return this.__createVirtualDom(schema[0], scope, parentInfo);
                     }
+                    // 递归处理每个子元素
                     return schema.map((item, idy) => this.__createVirtualDom(
                             item,
                             scope,
                             parentInfo,
+                            // 如果有自定义 key 则使用，否则使用索引
                             (item as IPublicTypeNodeSchema)?.__ctx?.lceKey ? '' : String(idy),
                         ));
                 }
@@ -608,11 +644,16 @@ export default function baseRendererFactory(): IBaseRenderComponent {
                     );
                 }
 
+                // ========== 处理循环渲染 ==========
+                // 如果存在 loop 属性，表示需要循环渲染该组件
                 if (schema.loop != null) {
+                    // 解析循环数据，可能是数组或表达式
                     const loop = this.__parseData(schema.loop, scope);
+                    // 空数组不渲染
                     if (Array.isArray(loop) && loop.length === 0) return null;
                     const useLoop = isUseLoop(loop, this.__designModeIsDesign);
                     if (useLoop) {
+                        // 进入循环渲染逻辑
                         return this.__createLoopVirtualDom(
                             {
                                 ...schema,
