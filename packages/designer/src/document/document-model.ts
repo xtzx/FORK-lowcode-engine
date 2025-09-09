@@ -421,51 +421,66 @@ export class DocumentModel implements IDocumentModel {
     };
   }
 
-  /**
-   * 根据 schema 创建一个节点
-   */
+  // 🔥 【步骤4】根据 Schema 数据创建节点实例的核心方法
+  // 这是组件库拖拽的关键步骤：将 NodeData(Schema) 转换为实际的 Node 对象
   @action
   createNode<T extends INode = INode, C = undefined>(data: GetDataType<C, T>): T {
-    let schema: any;
+    let schema: any; // 标准化后的 Schema 数据
+
+    // 🎯 处理特殊类型的数据：文本节点或 JS 表达式
     if (isDOMText(data) || isJSExpression(data)) {
+      // 将纯文本或表达式包装为 Leaf 节点的 Schema
       schema = {
-        componentName: 'Leaf',
-        children: data,
+        componentName: 'Leaf', // 文本节点使用 'Leaf' 作为组件名
+        children: data,        // 文本内容或表达式作为子内容
       };
     } else {
+      // 🔥 组件库拖拽的数据走这里：直接使用传入的 Schema 数据
       schema = data;
     }
 
     let node: INode | null = null;
+
+    // 🔍 ID 冲突检查：如果文档中已存在相同 ID 的节点，清除 ID（让系统自动生成新 ID）
     if (this.hasNode(schema?.id)) {
       schema.id = null;
     }
+
+    // 🔄 节点复用逻辑（在实际应用中很少触发，主要用于特殊场景）
     /* istanbul ignore next */
     if (schema.id) {
-      node = this.getNode(schema.id);
+      node = this.getNode(schema.id); // 尝试获取已存在的节点
       // TODO: 底下这几段代码似乎永远都进不去
       if (node && node.componentName === schema.componentName) {
         if (node.parent) {
-          node.internalSetParent(null, false);
+          node.internalSetParent(null, false); // 从原父容器中移除
           // will move to another position
           // todo: this.activeNodes?.push(node);
         }
-        node.import(schema, true);
+        node.import(schema, true); // 用新 Schema 更新现有节点
       } else if (node) {
-        node = null;
+        node = null; // 组件类型不匹配，不能复用
       }
     }
+
+    // 🏗️ 创建新节点实例（组件库拖拽的常规路径）
     if (!node) {
+      // 🔥 【关键】使用 Node 构造函数创建新的节点实例
+      // - this: 当前文档实例，作为节点的 document 引用
+      // - schema: 组件的 Schema 数据，包含 componentName、props、children 等
       node = new Node(this, schema);
       // will add
       // todo: this.activeNodes?.push(node);
     }
 
-    this._nodesMap.set(node.id, node);
-    this.nodes.add(node);
+    // 📝 将节点注册到文档的节点管理系统中
+    this._nodesMap.set(node.id, node); // 添加到 ID -> Node 的映射表
+    this.nodes.add(node);               // 添加到节点集合
 
+    // 🔔 发送节点创建事件，供其他模块监听（如历史记录、插件等）
     this.emitter.emit('nodecreate', node);
-    return node as any;
+
+    return node as any; // 返回创建的节点实例
   }
 
   public destroyNode(node: INode) {

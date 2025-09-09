@@ -1478,45 +1478,76 @@ export function comparePosition(node1: INode, node2: INode): PositionNO {
   return PositionNO.BeforeOrAfter;
 }
 
+// 🔥 【步骤2】插入单个子节点的核心函数
+// 这个函数负责处理不同类型的 thing（现有节点、节点数据）转换为实际节点并插入
 export function insertChild(
-  container: INode,
-  thing: INode | IPublicTypeNodeData,
-  at?: number | null,
-  copy?: boolean,
+  container: INode,                        // 目标父容器节点
+  thing: INode | IPublicTypeNodeData,      // 要插入的内容：现有节点 或 节点数据(Schema)
+  at?: number | null,                      // 插入位置索引，null 表示末尾
+  copy?: boolean,                          // 是否复制模式（true=复制，false=移动）
 ): INode | null {
-  let node: INode | null | IRootNode | undefined;
-  let nodeSchema: IPublicTypeNodeSchema;
+  let node: INode | null | IRootNode | undefined; // 最终要插入的节点实例
+  let nodeSchema: IPublicTypeNodeSchema;          // 节点 Schema 数据
+
+  // 🎯 情况1：thing 是现有节点 且 需要复制 或 是插槽节点
   if (isNode<INode>(thing) && (copy || thing.isSlot())) {
+    // 导出节点的 Schema（克隆阶段，包含所有属性和子节点）
     nodeSchema = thing.export(IPublicEnumTransformStage.Clone);
+    // 🔥 【步骤4】调用 document.createNode 创建新的节点实例
     node = container.document?.createNode(nodeSchema);
-  } else if (isNode<INode>(thing)) {
+  }
+  // 🎯 情况2：thing 是现有节点 且 是移动模式（非复制、非插槽）
+  else if (isNode<INode>(thing)) {
+    // 直接使用现有节点，不需要创建新实例
     node = thing;
-  } else if (isNodeSchema(thing)) {
+  }
+  // 🎯 情况3：thing 是节点数据(Schema) - 🔥 组件库拖拽走这个分支
+  else if (isNodeSchema(thing)) {
+    // 🔥 【步骤4】根据 Schema 数据创建新的节点实例
+    // 这是组件库拖拽的关键步骤：NodeData -> Node 实例
     node = container.document?.createNode(thing);
   }
 
+  // 如果成功获得了有效的节点实例
   if (isNode<INode>(node)) {
+    // 🔥 【步骤3】调用容器的 children.insert 方法将节点插入到指定位置
+    // 这里会触发 NodeChildren.insert -> NodeChildren.internalInsert
     container.children?.insert(node, at);
-    return node;
+    return node; // 返回成功插入的节点
   }
 
-  return null;
+  return null; // 插入失败，返回 null
 }
 
+// 🔥 【步骤2】批量插入子节点的函数 - Designer.onDragend 直接调用
+// 负责将多个节点或节点数据按顺序插入到指定容器中
 export function insertChildren(
-  container: INode,
-  nodes: INode[] | IPublicTypeNodeData[],
-  at?: number | null,
-  copy?: boolean,
+  container: INode,                        // 目标父容器节点
+  nodes: INode[] | IPublicTypeNodeData[],  // 要插入的节点数组：现有节点数组 或 Schema数据数组
+  at?: number | null,                      // 起始插入位置索引
+  copy?: boolean,                          // 是否复制模式
 ): INode[] {
-  let index = at;
-  let node: any;
-  const results: INode[] = [];
+  let index = at;                          // 当前插入位置，会随着插入过程递增
+  let node: any;                           // 当前处理的节点
+  const results: INode[] = [];             // 存储成功插入的节点实例数组
+
+  // 🔄 从数组末尾开始逐个弹出并处理（保证插入顺序正确）
+  // 使用 while + pop() 的方式是为了确保多个节点按正确顺序插入
   // eslint-disable-next-line no-cond-assign
   while ((node = nodes.pop())) {
+    // 🔥 【核心调用】对每个节点调用 insertChild 进行单个插入
+    // 这里会处理 NodeData -> Node 的转换（如果需要）
     node = insertChild(container, node, index, copy);
+
+    // 将成功插入的节点添加到结果数组
     results.push(node);
+
+    // 📍 更新下一个节点的插入位置
+    // 使用刚插入节点的实际索引，确保后续节点插入在正确位置
     index = node.index;
   }
+
+  // 返回所有成功插入的节点实例数组
+  // 这个数组会被 Designer.onDragend 用于后续的选中操作
   return results;
 }

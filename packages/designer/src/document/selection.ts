@@ -42,22 +42,32 @@ export class Selection implements ISelection {
     this.emitter.emit('selectionchange', this._selected);
   }
 
-  /**
-   * 批量选中
-   */
+  // 🔥 【步骤5】批量选中节点的方法 - 插入完成后自动选中新节点
+  // 用于在节点插入后自动选中新插入的节点，提升用户体验
   selectAll(ids: string[]) {
-    const selectIds: string[] = [];
+    const selectIds: string[] = []; // 存储实际可选中的节点 ID 数组
 
+    // 🔍 遍历所有传入的节点 ID，进行选中资格检查
     ids.forEach(d => {
+      // 根据 ID 获取对应的节点实例
       const node = this.doc.getNode(d);
 
+      // 🎯 节点有效性和可选中性检查
+      // canSelect() 会检查：节点是否存在、是否被锁定、是否在条件渲染中等
       if (node?.canSelect()) {
-        selectIds.push(d);
+        selectIds.push(d); // 只有可选中的节点才添加到选中列表
       }
     });
 
+    // 📝 更新内部选中状态
     this._selected = selectIds;
 
+    // 🔔 发送选中变化事件，通知所有监听者
+    // 这会触发：
+    // - 大纲树高亮对应节点
+    // - 属性面板显示选中节点的属性
+    // - BemTools 显示选中边框
+    // - 其他插件的选中响应逻辑
     this.emitter.emit('selectionchange', this._selected);
   }
 

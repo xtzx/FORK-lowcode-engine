@@ -29,31 +29,31 @@ export default class DragGhost extends Component<{designer: Designer}> {
         super(props);
         makeObservable(this);
         this.dispose = [
-            // this.dragon.onDragstart((e) => {
-            //   if (e.originalEvent.type.slice(0, 4) === 'drag') {
-            //     return;
-            //   }
-            //   this.titles = this.getTitles(e.dragObject);
-            //   this.x = e.globalX;
-            //   this.y = e.globalY;
-            // }),
-            // this.dragon.onDrag((e) => {
-            //   this.x = e.globalX;
-            //   this.y = e.globalY;
-            //   if (isSimulatorHost(e.sensor)) {
-            //     const container = e.sensor.getDropContainer(e);
-            //     if (container?.container.componentMeta.advanced.isAbsoluteLayoutContainer) {
-            //       this.isAbsoluteLayoutContainer = true;
-            //       return;
-            //     }
-            //   }
-            //   this.isAbsoluteLayoutContainer = false;
-            // }),
-            // this.dragon.onDragend(() => {
-            //   this.titles = null;
-            //   this.x = 0;
-            //   this.y = 0;
-            // }),
+            this.dragon.onDragstart((e) => {
+              if (e.originalEvent.type.slice(0, 4) === 'drag') {
+                return;
+              }
+              this.titles = this.getTitles(e.dragObject);
+              this.x = e.globalX;
+              this.y = e.globalY;
+            }),
+            this.dragon.onDrag((e) => {
+              this.x = e.globalX;
+              this.y = e.globalY;
+              if (isSimulatorHost(e.sensor)) {
+                const container = e.sensor.getDropContainer(e);
+                if (container?.container.componentMeta.advanced.isAbsoluteLayoutContainer) {
+                  this.isAbsoluteLayoutContainer = true;
+                  return;
+                }
+              }
+              this.isAbsoluteLayoutContainer = false;
+            }),
+            this.dragon.onDragend(() => {
+              this.titles = null;
+              this.x = 0;
+              this.y = 0;
+            }),
         ];
     }
 

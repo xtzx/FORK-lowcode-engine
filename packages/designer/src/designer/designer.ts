@@ -277,34 +277,72 @@ export class Designer implements IDesigner {
             this.postEvent('drag', e);
         });
 
+        // 🔥 【步骤1】注册拖拽结束事件监听器 - 这是数据真正插入文档的入口
         this.dragon.onDragend((e) => {
+            // 从拖拽引擎获取拖拽对象和复制标记
             const { dragObject, copy } = e;
             logger.debug('onDragend: dragObject ', dragObject, ' copy ', copy);
+
+            // 获取当前的放置位置信息（在拖拽过程中通过 locate 方法持续更新）
             const loc = this._dropLocation;
+
             if (loc) {
+                // 检查是否为有效的子节点放置位置（区分插入到子节点 vs 替换节点）
                 if (isLocationChildrenDetail(loc.detail) && loc.detail.valid !== false) {
-                    let nodes: INode[] | undefined;
+                    let nodes: INode[] | undefined; // 存储成功插入的节点数组
+
+                    // 🎯 情况A：拖拽的是已存在的节点（从画布移动）
                     if (isDragNodeObject(dragObject)) {
+                        // 调用 insertChildren 插入现有节点到目标位置
+                        // - loc.target: 目标父容器节点
+                        // - [...dragObject.nodes]: 被拖拽的节点数组（展开避免引用问题）
+                        // - loc.detail.index: 插入位置索引
+                        // - copy: 是否复制（true=复制，false=移动）
                         nodes = insertChildren(loc.target, [...dragObject.nodes], loc.detail.index, copy);
-                    } else if (isDragNodeDataObject(dragObject)) {
-                        // process nodeData
+                    }
+                    // 🎯 情况B：拖拽的是组件库中的组件数据（新增组件）
+                    else if (isDragNodeDataObject(dragObject)) {
+                        // 🔥 【关键】这是组件库拖拽的处理分支
+
+                        // 统一处理数据格式：单个对象转为数组
                         const nodeData = Array.isArray(dragObject.data) ? dragObject.data : [dragObject.data];
+
+                        // 数据有效性检查：确保所有数据都是合法的 NodeSchema
                         const isNotNodeSchema = nodeData.find((item) => !isNodeSchema(item));
                         if (isNotNodeSchema) {
-                            return;
+                            return; // 有无效数据，直接退出
                         }
+
+                        // 🔥 【核心调用】调用 insertChildren 将 NodeData 转换为 Node 并插入
+                        // - loc.target: 目标父容器节点
+                        // - nodeData: 组件 Schema 数据数组
+                        // - loc.detail.index: 插入位置索引
+                        // - 注意：组件库拖拽不传递 copy 参数，默认为新增模式
                         nodes = insertChildren(loc.target, nodeData, loc.detail.index);
                     }
+
+                    // 🎯 插入成功后的后续处理
                     if (nodes) {
+                        // 【步骤5】自动选中新插入的所有节点
+                        // 将节点数组转为 ID 数组，调用 selection.selectAll
                         loc.document?.selection.selectAll(nodes.map((o) => o.id));
+
+                        // 【步骤6】延迟聚焦到第一个插入的节点（滚动到可视区域）
+                        // 使用 setTimeout 确保选中状态更新完成后再执行
                         setTimeout(() => this.activeTracker.track(nodes![0]), 10);
                     }
                 }
             }
+
+            // 调用外部自定义的 onDragend 回调（如果存在）
             if (this.props?.onDragend) {
                 this.props.onDragend(e, loc);
             }
+
+            // 发送全局 dragend 事件，供其他模块监听
             this.postEvent('dragend', e, loc);
+
+            // 重新启用节点检测功能（拖拽过程中被禁用以避免干扰）
             this.detecting.enable = true;
         });
 

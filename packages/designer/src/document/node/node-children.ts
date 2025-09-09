@@ -264,64 +264,87 @@ export class NodeChildren implements INodeChildren {
     return false;
   }
 
+  // 🔥 【步骤3】公开的节点插入接口 - 由 insertChild 函数调用
   insert(node: INode, at?: number | null): void {
+    // 直接调用内部插入方法，启用变更器（useMutator = true）
+    // useMutator = true 表示此次插入会触发历史记录、撤销重做等功能
     this.internalInsert(node, at, true);
   }
 
-  /**
-   * 插入一个节点，返回新长度
-   */
+  // 🔥 【步骤3】内部节点插入的核心实现方法
+  // 处理节点在子节点数组中的实际插入逻辑，包括位置计算、父子关系建立、事件触发等
   internalInsert(node: INode, at?: number | null, useMutator = true): void {
-    const { children } = this;
+    const { children } = this; // 获取当前容器的子节点数组
+
+    // 📍 计算实际插入位置：null 或 -1 表示末尾插入
     let index = at == null || at === -1 ? children.length : at;
 
+    // 🔍 检查节点是否已存在于当前子节点数组中
     const i = children.map(d => d.id).indexOf(node.id);
 
+    // 🚚 如果节点原本有父容器（移动操作），先从原位置移除
     if (node.parent) {
       const editor = node.document?.designer.editor;
+      // 发送节点从顶层移除的事件（用于历史记录等功能）
       editor?.eventBus.emit('node.remove.topLevel', {
         node,
         index: node.index,
       });
     }
 
+    // 🎯 情况A：节点不存在于当前数组中（新增或从其他容器移入）
     if (i < 0) {
+      // 在指定位置插入节点
       if (index < children.length) {
-        children.splice(index, 0, node);
+        children.splice(index, 0, node); // 在中间位置插入
       } else {
-        children.push(node);
+        children.push(node); // 在末尾添加
       }
+      // 🔗 建立父子关系：设置节点的父容器为当前容器
       node.internalSetParent(this.owner, useMutator);
-    } else {
+    }
+    // 🎯 情况B：节点已存在于当前数组中（位置调整）
+    else {
+      // 如果目标位置在当前位置之后，需要调整索引（因为移除会影响位置）
       if (index > i) {
         index -= 1;
       }
 
+      // 如果目标位置与当前位置相同，无需操作
       if (index === i) {
         return;
       }
 
-      children.splice(i, 1);
-      children.splice(index, 0, node);
+      // 执行位置移动：先移除，再插入到新位置
+      children.splice(i, 1); // 从原位置移除
+      children.splice(index, 0, node); // 插入到新位置
     }
 
+    // 🔔 发送节点变化事件（内部使用）
     this.emitter.emit('change', {
       type: 'insert',
       node,
     });
+
+    // 🔔 发送节点插入事件（内部使用）
     this.emitter.emit('insert', node);
+
+    // 🔔 发送全局节点添加事件（供外部模块监听）
     /* istanbul ignore next */
     const editor = node.document?.designer.editor;
     editor?.eventBus.emit('node.add', { node });
+
+    // 📝 如果启用变更器，记录此次修改（用于撤销重做、历史记录等）
     if (useMutator) {
       this.reportModified(node, this.owner, { type: 'insert' });
     }
 
-    // check condition group
-    if (node.conditionGroup) {
+    // 🏷️ 处理条件分组逻辑（用于条件渲染的节点分组管理）
+    // 检查节点的条件分组设置
+  if (node.conditionGroup) {
       if (
         !(
-          // just sort at condition group
+          // 如果节点不在条件分组的上下文中，清除分组设置
           (
             (node.prevSibling && node.prevSibling.conditionGroup === node.conditionGroup) ||
             (node.nextSibling && node.nextSibling.conditionGroup === node.conditionGroup)
@@ -331,9 +354,11 @@ export class NodeChildren implements INodeChildren {
         node.setConditionGroup(null);
       }
     }
+
+    // 🏷️ 自动设置条件分组：如果插入位置的前后节点属于同一条件分组
     if (node.prevSibling && node.nextSibling) {
       const { conditionGroup } = node.prevSibling;
-      // insert at condition group
+      // 如果前后兄弟节点都在同一条件分组中，将当前节点也加入该分组
       if (conditionGroup && conditionGroup === node.nextSibling.conditionGroup) {
         node.setConditionGroup(conditionGroup);
       }
