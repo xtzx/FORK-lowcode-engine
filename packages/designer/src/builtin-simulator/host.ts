@@ -1732,53 +1732,81 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
   // ========= drag location logic: helper for locate ==========
 
   /**
+   * 🎯 拖拽定位核心方法 - 传感器接口实现
+   *
+   * 📋 主要职责：
+   * 1. 验证拖拽对象是否可移动
+   * 2. 查找合适的投放容器
+   * 3. 计算精确的插入位置
+   * 4. 创建并返回位置数据对象
+   *
+   * @param e - 定位事件，包含拖拽对象、目标元素、鼠标坐标等信息
+   * @returns DropLocation | null - 投放位置对象或null
+   *
    * @see IPublicModelSensor
    */
   locate(e: ILocateEvent): any {
-    const { dragObject } = e;
+    // 📦 1. 提取拖拽对象信息
+    const { dragObject } = e; // 从定位事件中提取拖拽对象（可能是现有节点或新组件数据）
 
-    const nodes = dragObject?.nodes;
+    const nodes = dragObject?.nodes; // 获取被拖拽的节点数组（仅当拖拽现有节点时存在）
 
+    // 🔍 2. 过滤出可操作的节点（检查移动权限）
     const operationalNodes = nodes?.filter((node) => {
+      // 🎣 检查节点自身的移动钩子函数
       const onMoveHook = node.componentMeta?.advanced.callbacks?.onMoveHook;
+      // 调用移动钩子函数，如果未定义则默认允许移动
       const canMove = onMoveHook && typeof onMoveHook === 'function' ? onMoveHook(node.internalToShellNode()) : true;
 
+      // 🔍 查找父级容器节点
       let parentContainerNode: INode | null = null;
       let parentNode = node.parent;
 
+      // 向上遍历节点树，找到第一个容器节点
       while (parentNode) {
         if (parentNode.isContainer()) {
-          parentContainerNode = parentNode;
+          parentContainerNode = parentNode; // 找到父级容器节点
           break;
         }
-
-        parentNode = parentNode.parent;
+        parentNode = parentNode.parent; // 继续向上查找
       }
 
+      // 🎣 检查父级容器的子节点移动钩子函数
       const onChildMoveHook = parentContainerNode?.componentMeta?.advanced.callbacks?.onChildMoveHook;
+      // 调用子节点移动钩子，检查父级容器是否允许该子节点移动
+      const childrenCanMove = onChildMoveHook && parentContainerNode && typeof onChildMoveHook === 'function'
+        ? onChildMoveHook(node.internalToShellNode(), parentContainerNode.internalToShellNode())
+        : true;
 
-      const childrenCanMove = onChildMoveHook && parentContainerNode && typeof onChildMoveHook === 'function' ? onChildMoveHook(node.internalToShellNode(), parentContainerNode.internalToShellNode()) : true;
-
+      // ✅ 只有同时满足节点可移动和父级允许子节点移动时，才允许操作
       return canMove && childrenCanMove;
     });
 
+    // 🚫 如果没有可操作的节点，直接返回，阻止拖拽操作
     if (nodes && (!operationalNodes || operationalNodes.length === 0)) {
-      return;
+      return; // 提前退出，不进行后续的定位计算
     }
 
-    this.sensing = true;
-    this.scroller.scrolling(e);
-    const document = this.project.currentDocument;
+    // 📡 3. 激活传感器和滚动处理
+    this.sensing = true; // 标记传感器处于活跃状态
+    this.scroller.scrolling(e); // 处理拖拽时的自动滚动逻辑
+
+    // 📄 4. 获取当前文档实例
+    const document = this.project.currentDocument; // 获取当前活跃的文档对象
     if (!document) {
-      return null;
+      return null; // 没有文档时无法进行定位，直接返回
     }
-    const dropContainer = this.getDropContainer(e);
+
+    // 🎯 5. 核心：查找投放容器（这是判断拖入容器还是画布的关键步骤）
+    const dropContainer = this.getDropContainer(e); // 🔥 调用核心方法查找合适的投放容器
+
+    // 🔒 6. 检查容器是否被锁定
     const lockedNode = getClosestNode(dropContainer?.container, (node) => node.isLocked);
-    if (lockedNode) return null;
-    if (
-      !dropContainer
-    ) {
-      return null;
+    if (lockedNode) return null; // 如果找到锁定的节点，阻止拖拽
+
+    // ❌ 7. 容器查找失败的处理
+    if (!dropContainer) {
+      return null; // 没有找到合适的容器，拖拽操作无效
     }
 
     if (isLocationData(dropContainer)) {
@@ -1929,107 +1957,163 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
   }
 
   /**
-   * 查找合适的投放容器
+   * 🎯 查找合适的投放容器 - 容器判断核心逻辑
+   *
+   * 📋 这个方法是判断「拖入容器」还是「拖入画布」的关键所在！
+   *
+   * 🔍 判断流程：
+   * 1. DOM元素 → 节点映射：从鼠标位置的DOM元素找到对应的低代码节点
+   * 2. 容器类型检查：判断节点是否为容器类型（meta.isContainer）
+   * 3. 父级查找：非容器节点向上查找父级容器
+   * 4. 冲突避免：防止节点拖拽到自己内部造成循环
+   * 5. 权限验证：通过handleAccept验证容器是否可接受拖拽
+   *
+   * @param e - 定位事件，包含target(DOM元素)和dragObject(拖拽对象)
+   * @returns DropContainer | null - 找到的投放容器或null
    */
   getDropContainer(e: ILocateEvent): DropContainer | null {
-    const { target, dragObject } = e;
-    const isAny = isDragAnyObject(dragObject);
-    const document = this.project.currentDocument!;
-    const { currentRoot } = document;
-    let container: INode | null;
-    let nodeInstance: IPublicTypeNodeInstance<IPublicTypeComponentInstance, INode> | undefined;
+    // 📦 1. 提取核心数据
+    const { target, dragObject } = e; // target: 鼠标所在的DOM元素, dragObject: 被拖拽的对象
+    const isAny = isDragAnyObject(dragObject); // 判断是否为特殊拖拽对象（非节点和组件数据）
+    const document = this.project.currentDocument!; // 获取当前文档实例
+    const { currentRoot } = document; // 获取文档根节点，作为最终兜底容器
+    let container: INode | null; // 候选容器节点
+    let nodeInstance: IPublicTypeNodeInstance<IPublicTypeComponentInstance, INode> | undefined; // DOM实例引用
 
+    // 🎯 2. 核心：DOM元素到节点的映射（判断拖入位置的第一步）
     if (target) {
-      const ref = this.getNodeInstanceFromElement(target);
+      // 🔑 关键调用：从DOM元素查找对应的低代码节点
+      const ref = this.getNodeInstanceFromElement(target); // 这是DOM→节点映射的核心方法
+
       if (ref?.node) {
-        nodeInstance = ref;
-        container = ref.node;
+        // ✅ 成功映射：找到了对应的节点
+        nodeInstance = ref; // 保存节点实例引用
+        container = ref.node; // 将找到的节点作为候选容器
       } else if (isAny) {
-        return null;
+        // ❌ 特殊拖拽对象但无法映射节点
+        return null; // 直接返回null，不支持此类操作
       } else {
-        container = currentRoot;
+        // 🏠 兜底策略：映射失败时使用根节点作为容器
+        container = currentRoot; // 将拖拽目标设为根节点（整个画布）
       }
     } else if (isAny) {
-      return null;
+      // 🚫 没有目标元素且为特殊拖拽对象
+      return null; // 无法处理，返回null
     } else {
-      container = currentRoot;
+      // 🏠 没有目标元素时的兜底策略
+      container = currentRoot; // 默认拖入根节点（画布）
     }
 
+    // 🏗️ 3. 容器类型检查与修正
     if (!container?.isParental()) {
-      container = container?.parent || currentRoot;
+      // 🔍 如果当前节点不是容器类型，向上查找父级容器
+      // isParental() 检查节点是否可以包含子节点
+      container = container?.parent || currentRoot; // 使用父节点或根节点作为容器
     }
 
+    // 🚧 4. 特殊拖拽对象的早期退出
     // TODO: use spec container to accept specialData
     if (isAny) {
       // will return locationData
-      return null;
+      return null; // 特殊拖拽对象暂不支持复杂的容器查找逻辑
     }
 
+    // 🔄 5. 防止循环拖拽：避免节点拖拽到自己内部
     // get common parent, avoid drop container contains by dragObject
-    const drillDownExcludes = new Set<INode>();
+    const drillDownExcludes = new Set<INode>(); // 记录需要排除的节点
     if (isDragNodeObject(dragObject)) {
-      const { nodes } = dragObject;
+      // 只有拖拽现有节点时才需要检查循环拖拽
+      const { nodes } = dragObject; // 获取被拖拽的节点列表
       let i = nodes.length;
-      let p: any = container;
+      let p: any = container; // 从当前容器开始检查
+
+      // 遍历所有被拖拽的节点
       while (i-- > 0) {
         if (contains(nodes[i], p)) {
-          p = nodes[i].parent;
+          // 🚫 发现循环：容器包含在被拖拽的节点内
+          p = nodes[i].parent; // 向上移动到被拖拽节点的父级
         }
       }
+
       if (p !== container) {
-        container = p || document.focusNode;
-        container && drillDownExcludes.add(container);
+        // 🔧 修正容器：使用安全的父级节点或焦点节点
+        container = p || document.focusNode; // 使用修正后的容器
+        container && drillDownExcludes.add(container); // 记录排除的节点
       }
     }
 
+    // 🎯 6. 获取组件实例（React实例，用于后续的位置计算）
     let instance: any;
     if (nodeInstance) {
+      // 情况1: 有节点实例引用
       if (nodeInstance.node === container) {
-        instance = nodeInstance.instance;
+        // 节点实例直接对应当前容器
+        instance = nodeInstance.instance; // 直接使用实例
       } else {
+        // 节点实例与容器不匹配，需要查找最近的实例
         instance = this.getClosestNodeInstance(
           nodeInstance.instance as any,
           container?.id,
-        )?.instance;
+        )?.instance; // 查找容器对应的React实例
       }
     } else {
-      instance = container && this.getComponentInstances(container)?.[0];
+      // 情况2: 没有节点实例引用，直接获取容器的组件实例
+      instance = container && this.getComponentInstances(container)?.[0]; // 获取容器的第一个组件实例
     }
 
+    // 🏗️ 7. 构建投放容器对象
     let dropContainer: DropContainer = {
-      container: container as any,
-      instance,
+      container: container as any, // 低代码节点
+      instance, // React组件实例
     };
 
-    let res: any;
-    let upward: DropContainer | null = null;
+    // 🔍 8. 容器接受验证循环（向上查找可接受的容器）
+    let res: any; // 验证结果
+    let upward: DropContainer | null = null; // 向上查找的容器
+
     while (container) {
-      res = this.handleAccept(dropContainer, e);
+      // 🎯 关键验证：检查容器是否可以接受拖拽
+      res = this.handleAccept(dropContainer, e); // 🔥 调用容器接受验证方法
+
       // if (isLocationData(res)) {
       //   return res;
       // }
+
       if (res === true) {
-        return dropContainer;
+        // ✅ 容器接受验证通过
+        return dropContainer; // 返回找到的有效容器
       }
+
       if (!res) {
-        drillDownExcludes.add(container);
+        // ❌ 当前容器不接受拖拽，尝试向上查找父级容器
+        drillDownExcludes.add(container); // 记录已检查的容器，避免重复
+
         if (upward) {
+          // 使用预设的向上查找容器
           dropContainer = upward;
           container = dropContainer.container;
           upward = null;
         } else if (container.parent) {
-          container = container.parent;
+          // 向上查找父级容器
+          container = container.parent; // 移动到父级节点
+
+          // 获取父级容器对应的组件实例
           instance = this.getClosestNodeInstance(dropContainer.instance, container.id)?.instance;
+
+          // 构建新的投放容器对象
           dropContainer = {
             container,
             instance,
           };
         } else {
-          return null;
+          // 🚫 已经到达根节点仍未找到可接受的容器
+          return null; // 拖拽操作无效
         }
       }
     }
-    return null;
+
+    // 🚫 所有容器都不接受拖拽
+    return null; // 返回null，表示拖拽无法完成
   }
 
   isAcceptable(): boolean {
@@ -2037,26 +2121,54 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
   }
 
   /**
-   * 控制接受
+   * 🎯 容器接受验证 - 最终判断容器是否可接受拖拽的关键方法
+   *
+   * 📋 这里是「拖入容器」vs「拖入画布」判断的最终验证！
+   *
+   * 🔍 验证逻辑：
+   * 1. 根节点或焦点容器：使用文档级嵌套检查
+   * 2. 普通容器：检查 meta.isContainer 标志
+   * 3. 特殊容器：通过 isAcceptable 方法自定义验证
+   * 4. 嵌套规则：检查父子组件兼容性
+   *
+   * ⚠️  关键点：meta.isContainer = false 的组件将被拒绝！
+   *
+   * @param dropContainer - 候选投放容器（包含节点和实例）
+   * @param e - 定位事件（包含拖拽对象）
+   * @returns boolean - true表示接受拖拽，false表示拒绝
    */
   handleAccept({ container }: DropContainer, e: ILocateEvent): boolean {
-    const { dragObject } = e;
-    const document = this.currentDocument!;
-    const { focusNode } = document;
+    // 📦 1. 提取验证所需数据
+    const { dragObject } = e; // 获取拖拽对象（组件数据或现有节点）
+    const document = this.currentDocument!; // 获取当前文档实例
+    const { focusNode } = document; // 获取当前焦点节点
+
+    // 🏠 2. 根节点和焦点容器的特殊处理
     if (isRootNode(container) || container.contains(focusNode)) {
+      // 如果是根节点或包含焦点节点的容器，使用文档级的嵌套检查
+      // 这种情况下会检查更复杂的嵌套规则和组件兼容性
       return document.checkNesting(focusNode!, dragObject as any);
     }
 
-    const meta = (container as Node).componentMeta;
+    // 📋 3. 获取组件元数据 - 这里是关键的容器类型检查！
+    const meta = (container as Node).componentMeta; // 获取组件的元数据配置
 
+    // 🔧 4. 自定义可接受性检查（扩展点）
     // FIXME: get containerInstance for accept logic use
-    const acceptable: boolean = this.isAcceptable(container);
+    const acceptable: boolean = this.isAcceptable(container); // 调用自定义接受检查
+
+    // 🎯 5. 核心判断：检查是否为容器组件
     if (!meta.isContainer && !acceptable) {
-      return false;
+      // ❌ 关键检查：如果组件的 meta.isContainer 为 false 且不被自定义逻辑接受
+      // 这就是为什么 JSSlot 拖拽失败的原因！JSSlot 组件通常 meta.isContainer = false
+      return false; // 拒绝拖拽，返回 false
     }
 
-    // check nesting
-    return document.checkNesting(container, dragObject as any);
+    // ✅ 通过容器检查，继续进行嵌套规则验证
+
+    // 🔗 6. 最终的嵌套兼容性检查
+    // check nesting - 检查父子组件的兼容性（如 Button 不能包含 Button）
+    return document.checkNesting(container, dragObject as any); // 返回嵌套规则检查结果
   }
 
   /**

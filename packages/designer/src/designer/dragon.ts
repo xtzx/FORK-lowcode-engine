@@ -333,9 +333,13 @@ export class Dragon implements IDragon {
                 this.emitter.emit('rgl.remove.placeholder'); // 移除RGL占位符
                 this.emitter.emit('rgl.sleeping', true); // RGL系统进入休眠
             }
-            // 常规的传感器定位逻辑
+            // 🎯 常规的传感器定位逻辑（核心容器判断入口）
             if (sensor) {
                 sensor.fixEvent(locateEvent); // 让传感器修正事件对象（如坐标转换）
+
+                // 🔥 关键调用：这里触发容器判断逻辑！
+                // sensor.locate() 会调用 BuiltinSimulatorHost.locate()
+                // 最终调用 getDropContainer() 和 handleAccept() 来判断容器
                 sensor.locate(locateEvent); // 执行定位，更新位置信息和视觉反馈
             } else {
                 designer.clearLocation(); // 没有传感器时清除位置信息
