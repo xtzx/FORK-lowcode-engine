@@ -593,18 +593,39 @@ const builtinComponents = {
     Leaf,
 };
 
+// 🔑 全局缓存React内部属性键名
+// React在应用启动时生成一个随机后缀，同一应用中所有组件使用相同的属性名
+// 例如: 所有组件都使用 '__reactFiber$abc123def'，而不是每个组件都不同
 let REACT_KEY = '';
+
+/**
+ * 🔍 动态发现并缓存React内部Fiber节点的访问键名
+ * React不同版本使用不同的属性名来存储Fiber节点引用
+ * @param el - DOM元素
+ * @returns 处理后的DOM元素（主要为了缓存副作用）
+ */
 function cacheReactKey(el: Element): Element {
+    // 📦 如果已经缓存过键名，直接返回
+    // ✅ 缓存机制正确：同一React应用中所有组件使用相同的属性名
     if (REACT_KEY !== '') {
         return el;
     }
-    // react17 采用 __reactFiber 开头
-    REACT_KEY =
-        Object.keys(el).find((key) => key.startsWith('__reactInternalInstance$') || key.startsWith('__reactFiber$')) ||
-        '';
+
+    // 🔍 在DOM元素的所有属性中查找React内部属性
+    // React版本差异：
+    // - React 15/16: '__reactInternalInstance$randomString'
+    // - React 17+:   '__reactFiber$randomString'
+    REACT_KEY = Object.keys(el).find((key) =>
+        key.startsWith('__reactInternalInstance$') || // React 15/16
+        key.startsWith('__reactFiber$'), // React 17+
+    ) || '';
+
+    // 🔄 如果当前元素没找到，向上递归查找父元素
+    // 不是所有DOM元素都直接有React属性
     if (!REACT_KEY && (el as HTMLElement).parentElement) {
         return cacheReactKey((el as HTMLElement).parentElement!);
     }
+
     return el;
 }
 
@@ -632,8 +653,10 @@ function getClosestNodeInstance(from: ReactInstance, specId?: string): IPublicTy
                 };
             }
         }
-        // get fiberNode from element
+        // 🍍 通过React内部属性获取Fiber节点
+        // el[REACT_KEY] 就是该DOM元素对应的React Fiber节点
         if (el[REACT_KEY]) {
+            // 🔄 从 Fiber 节点开始向上遍历 React 组件树
             return getNodeInstance(el[REACT_KEY], specId);
         }
         el = el.parentElement;

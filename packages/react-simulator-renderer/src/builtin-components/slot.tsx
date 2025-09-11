@@ -1,14 +1,18 @@
 import { Component } from 'react';
 
+// 🔥 Slot：低代码引擎的内置插槽组件
+// 用途：将JSSlot属性转换为真正的可渲染容器组件
 class Slot extends Component {
   static displayName = 'Slot';
 
-  static componentMetadata = {
-    componentName: 'Slot',
+  // 🎉 组件元数据配置：自动注册到低代码引擎
+static componentMetadata = {
+    componentName: 'Slot', // 固定的组件名
     configure: {
+      // 可配置属性
       props: [
         {
-          name: '___title',
+          name: '___title',     // 插槽标题（内部属性）
           title: {
             type: 'i18n',
             'en-US': 'Slot Title',
@@ -18,7 +22,7 @@ class Slot extends Component {
           defaultValue: '插槽容器',
         },
         {
-          name: '___params',
+          name: '___params',   // 插槽参数（内部属性）
           title: {
             type: 'i18n',
             'en-US': 'Slot Params',
@@ -42,15 +46,18 @@ class Slot extends Component {
         },
       ],
       component: {
-        isContainer: true,
+        // 🔥 最关键配置：标记为容器组件
+        isContainer: true,  // ✅ 这就是为什么Slot节点能被识别为可拖拽容器
       },
-      // events/className/style/general/directives
-      supports: false,
+      // 禁用通用特性：事件/类名/样式/通用/指令
+      supports: false, // 不支持通用的组件特性配置
     },
   };
 
   render() {
     const { children } = this.props;
+    // 📝 直接渲染children，作为透明容器
+    // children来自JSSlot的value内容
     return <>{children}</>;
   }
 }
