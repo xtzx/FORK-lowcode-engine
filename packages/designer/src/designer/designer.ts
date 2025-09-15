@@ -282,7 +282,6 @@ export class Designer implements IDesigner {
             // 从拖拽引擎获取拖拽对象和复制标记
             const { dragObject, copy } = e;
             logger.debug('onDragend: dragObject ', dragObject, ' copy ', copy);
-
             // 获取当前的放置位置信息（在拖拽过程中通过 locate 方法持续更新）
             const loc = this._dropLocation;
 

@@ -552,14 +552,9 @@ export default function baseRendererFactory(): IBaseRenderComponent {
                     return parseI18n(schema, scope);
                 }
 
-                // 3. JSSlot 插槽处理
+                // 3. 插槽
                 // 例如: { type: 'JSSlot', value: [...] }
-                // 🔥 关键差异点：JSSlot的渲染逻辑
                 if (isJSSlot(schema)) {
-                    // 直接递归渲染JSSlot的value内容
-                    // ✅ 如果value=[ComponentA]，会渲染ComponentA
-                    // ❌ 如果value=[]，什么都不渲染
-                    // 💡 注意：这里不会创建Slot容器节点，只是渲染内容
                     return this.__createVirtualDom(schema.value, scope, parentInfo);
                 }
 

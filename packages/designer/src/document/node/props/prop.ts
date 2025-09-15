@@ -348,8 +348,7 @@ export class Prop implements IProp, IPropParent {
   }
 
   /**
-   * 设置属性值，val 应该是 JSON 对象
-   * 🔥 这个方法是JSSlot转换为Slot节点的入口点
+   * set value, val should be JSON Object
    */
   @action
   setValue(val: IPublicTypeCompositeValue) {
@@ -358,20 +357,15 @@ export class Prop implements IProp, IPropParent {
     this._value = val;
     this._code = null;
     const t = typeof val;
-
-    // 📋 根据值的类型设置属性类型
     if (val == null) {
+      // this._value = undefined;
       this._type = 'literal';
     } else if (t === 'string' || t === 'number' || t === 'boolean') {
       this._type = 'literal';
     } else if (Array.isArray(val)) {
       this._type = 'list';
     } else if (isPlainObject(val)) {
-      // 🔥 关键判断：检测JSSlot类型
       if (isJSSlot(val)) {
-        // 🎉 自动调用setAsSlot，创建真正的Slot节点
-        // ✅ 如果val.value有内容，会创建Slot节点
-        // ❌ 如果val.value是空数组[]，也会创建Slot节点，但children为空
         this.setAsSlot(val);
       } else if (isJSExpression(val)) {
         this._type = 'expression';
@@ -435,14 +429,11 @@ export class Prop implements IProp, IPropParent {
 
   @action
   setAsSlot(data: IPublicTypeJSSlot) {
-    // 🔥 关键方法：将JSSlot属性转换为真正的Slot节点
     this._type = 'slot';
     let slotSchema: IPublicTypeSlotSchema;
-
-    // 处理特殊情况：当data.value本身就是Slot结构时
+    // 当 data.value 的结构为 { componentName: 'Slot' } 时，复用部分 slotSchema 数据
     if ((isPlainObject(data.value) && isNodeSchema(data.value) && data.value?.componentName === 'Slot')) {
       const value = data.value as IPublicTypeSlotSchema;
-      // 复用原有Slot的配置信息
       slotSchema = {
         componentName: 'Slot',
         title: value.title || value.props?.slotTitle,
@@ -452,30 +443,24 @@ export class Prop implements IProp, IPropParent {
         children: value.children,
       } as IPublicTypeSlotSchema;
     } else {
-      // 正常情况：创建新的Slot结构
       slotSchema = {
-        componentName: 'Slot',  // ✅ 固定的组件名
+        componentName: 'Slot',
         title: data.title,
         id: data.id,
         name: data.name,
         params: data.params,
-        children: data.value,   // 💡 关键：将JSSlot的value作为Slot的children
+        children: data.value,
       };
     }
 
-    // 更新或创廯aSlot节点
     if (this._slotNode) {
-      // 已存在Slot节点，直接更新
       this._slotNode.import(slotSchema);
     } else {
-      // 🔥 创建新的Slot节点（这个节点会有真实的DOM）
       const { owner } = this.props;
       this._slotNode = owner.document?.createNode<ISlotNode>(slotSchema);
       if (this._slotNode) {
-        // 💡 关键步骤：将Slot节点添加到文档中
-        owner.addSlot(this._slotNode);          // 添加到父节点的slot集合
-        this._slotNode.internalSetSlotFor(this); // 设置反向关联
-        // ✅ 至此，Slot节点创建完成，可以被渲染和getNodeInstanceFromElement识别
+        owner.addSlot(this._slotNode);
+        this._slotNode.internalSetSlotFor(this);
       }
     }
   }
