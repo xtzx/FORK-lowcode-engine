@@ -242,7 +242,6 @@ export class Designer implements IDesigner {
         this.project = new Project(this, props.defaultSchema, viewName);
 
         this.dragon = new Dragon(this);
-        // TODO:暂时没发现这段代码有什么功能 排查问题先注释
         this.dragon.onDragstart((e) => {
             console.log('Designer 类中 new Dragon 的 onDragstart');
 

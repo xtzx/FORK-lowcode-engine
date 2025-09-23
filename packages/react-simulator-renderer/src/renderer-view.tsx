@@ -221,38 +221,58 @@ class Renderer extends Component<{
         notFoundComponent={host.notFoundComponent}         // 组件未找到时的备用组件
         faultComponent={host.faultComponent}               // 组件渲染出错时的备用组件
         faultComponentMap={host.faultComponentMap}         // 特定组件的错误备用组件
-        // 自定义 createElement 方法，用于设计态特殊处理
+        // 🎨 自定义 createElement 方法，用于设计态特殊处理
+        // 这是实现设计态事件拦截和特殊渲染逻辑的核心入口
         customCreateElement={(Component: any, props: any, children: any) => {
+          // 提取组件ID，其余属性作为渲染属性
           const { __id, ...viewProps } = props;
-          viewProps.componentId = __id;
+          viewProps.componentId = __id;  // 设置组件ID，用于事件处理时定位节点
+
+          // 获取对应的节点实例，包含组件元信息和状态
           const leaf = documentInstance.getNode(__id) as Node;
+
+          // 如果是低代码组件，添加节点引用
           if (isFromVC(leaf?.componentMeta)) {
             viewProps._leaf = leaf.internalToShellNode();
           }
+
+          // 设置组件名称，用于调试和特殊处理
           viewProps._componentName = leaf?.componentName;
-          // 如果是容器 && 无children && 高宽为空 增加一个占位容器，方便拖动
+          // 🎯 空容器占位符逻辑：为空容器添加可视化占位，方便设计时拖拽操作
           if (
-            !viewProps.dataSource &&
-            leaf?.isContainer() &&
-            (children == null || (Array.isArray(children) && !children.length)) &&
-            (!viewProps.style || Object.keys(viewProps.style).length === 0)
+            !viewProps.dataSource &&                                // 无数据源
+            leaf?.isContainer() &&                                   // 是容器组件
+            (children == null || (Array.isArray(children) && !children.length)) && // 无子元素
+            (!viewProps.style || Object.keys(viewProps.style).length === 0)        // 无自定义样式
           ) {
+            // 设置默认占位文本
             let defaultPlaceholder = intl('Drag and drop components or templates here');
+
+            // 检查是否存在锁定的父节点
             const lockedNode = getClosestNode(leaf, (node) => {
               return node?.getExtraProp('isLocked')?.getValue() === true;
             });
+
+            // 如果节点被锁定，显示锁定提示
             if (lockedNode) {
               defaultPlaceholder = intl('Locked elements and child elements cannot be edited');
             }
+
+            // 创建占位符元素，提供可视化的拖拽目标区域
             children = (
               <div className={cn('lc-container-placeholder', { 'lc-container-locked': !!lockedNode })} style={viewProps.placeholderStyle}>
                 {viewProps.placeholder || defaultPlaceholder}
               </div>
             );
           }
+          // 🛡️ 设计态事件拦截：防止特定组件在设计态执行真实的业务逻辑
+
+          // 链接组件：移除href属性，防止设计态跳转
           if (viewProps._componentName === 'a') {
-            delete viewProps.href;
+            delete viewProps.href;  // 阻止设计态下的页面跳转
           }
+
+          // 菜单组件：设计态事件拦截示例
           // FIXME: 渲染仍有问题
           if (viewProps._componentName === 'Menu') {
             Object.assign(viewProps, {
@@ -260,27 +280,42 @@ class Renderer extends Component<{
               className: '_css_pesudo_menu_kbrzyh0f',
               context: { VE: (window as any).VisualEngine },
               direction: undefined,
-              events: { ignored: true },
+              events: { ignored: true },              // 🚫 忽略所有事件，防止设计态触发业务逻辑
               fieldId: 'menu_kbrzyh0f',
               footer: '',
               header: '',
               mode: 'inline',
-              onItemClick: { ignored: true },
-              onSelect: { ignored: true },
+              onItemClick: { ignored: true },         // 🚫 忽略点击事件
+              onSelect: { ignored: true },           // 🚫 忽略选择事件
               popupAlign: 'follow',
               selectMode: false,
               triggerType: 'click',
             });
           }
 
+          // 💡 这里可以添加更多组件的设计态事件拦截逻辑
+          // 典型的拦截模式：
+          // if (designMode === 'design') {
+          //   if (viewProps.onClick) {
+          //     viewProps.onClick = (e) => {
+          //       e.stopPropagation();
+          //       // 触发设计器选中逻辑而不是原始事件
+          //       designer.selectNode(leaf.id);
+          //     };
+          //   }
+          // }
+
+          // 🔍 组件有效性检查
           if (!isReactComponent(Component)) {
             console.error(`${viewProps._componentName} is not a react component!`);
             return null;
           }
 
+          // 🎨 最终渲染：应用设备视图和所有设计态处理后的属性
           return createElement(
-            getDeviceView(Component, device, designMode),
-            viewProps,
+            getDeviceView(Component, device, designMode),  // 获取适配设备的组件视图
+            viewProps,                                      // 经过设计态处理的属性
+            // 容器组件需要规范化children格式，确保始终是数组
             leaf?.isContainer() ? (children == null ? [] : Array.isArray(children) ? children : [children]) : children,
           );
         }}

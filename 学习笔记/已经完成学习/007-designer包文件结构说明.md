@@ -23,6 +23,7 @@ packages/designer/src/
 ## 详细文件功能说明
 
 ### 1. builtin-simulator/ （内置模拟器）
+
 **核心作用**：负责画布的渲染和交互，是设计器与渲染器之间的桥梁
 
 ```
@@ -61,6 +62,7 @@ builtin-simulator/
 ```
 
 ### 2. designer/ （设计器核心）
+
 **核心作用**：管理设计器的核心功能，包括拖拽、选择、定位等
 
 ```
@@ -90,6 +92,7 @@ designer/
 ```
 
 ### 3. document/ （文档模型）
+
 **核心作用**：管理页面文档的数据模型和操作
 
 ```
@@ -147,30 +150,35 @@ document/
 ### 最重要的文件（需要重点理解）
 
 #### 1. **host.ts** (1623行)
+
 - iframe 生命周期管理
 - 资源加载和注入
 - 事件处理（拖拽、选择、编辑）
 - 与渲染器通信
 
 #### 2. **dragon.ts** (640行)
+
 - 拖拽引擎核心
 - 处理从组件库拖入
 - 处理画布内拖拽
 - 投放位置计算
 
 #### 3. **node.ts**
+
 - 节点树管理
 - 组件增删改查
 - 属性管理
 - 父子关系维护
 
 #### 4. **document-model.ts**
+
 - 文档数据管理
 - Schema 导入导出
 - 历史记录
 - 事件通知
 
 #### 5. **designer.ts**
+
 - 设计器总控制器
 - 协调各模块
 - 对外API接口
@@ -179,10 +187,11 @@ document/
 ### 关键交互流程
 
 1. **组件拖入流程**：
+
    - dragon.ts 处理拖拽 → location.ts 计算位置 → node.ts 创建节点 → host.ts 通知渲染
-
 2. **属性修改流程**：
-   - setting-field.ts 触发 → prop.ts 更新 → document-model.ts 记录 → host.ts 通知渲染
 
+   - setting-field.ts 触发 → prop.ts 更新 → document-model.ts 记录 → host.ts 通知渲染
 3. **画布交互流程**：
+
    - detecting.ts 检测 → selection.ts 选中 → bem-tools 显示 → active-tracker.ts 跟踪状态

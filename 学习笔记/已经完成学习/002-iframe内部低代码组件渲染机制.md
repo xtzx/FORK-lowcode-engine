@@ -7,6 +7,7 @@ iframe 渲染完成后，内部的低代码组件渲染由 `SimulatorRenderer` �
 ## 核心渲染器架构
 
 ### 1. SimulatorRenderer（模拟器渲染器）
+
 - **位置**：`packages/react-simulator-renderer/src/renderer.ts`
 - **职责**：
   - 管理文档实例（DocumentInstance）
@@ -15,6 +16,7 @@ iframe 渲染完成后，内部的低代码组件渲染由 `SimulatorRenderer` �
   - 与设计器通信
 
 ### 2. LowCodeRenderer（低代码渲染器）
+
 - **位置**：`packages/react-renderer/src/index.ts` 和 `packages/renderer-core/src`
 - **职责**：
   - 将 Schema 转换为 React 组件
@@ -47,6 +49,7 @@ SimulatorRenderer（模拟器渲染器）
 ### 详细渲染步骤
 
 #### 步骤1：SimulatorRenderer 初始化
+
 ```javascript
 // packages/react-simulator-renderer/src/renderer.ts
 export class SimulatorRendererContainer {
@@ -72,6 +75,7 @@ export class SimulatorRendererContainer {
 ```
 
 #### 步骤2：渲染视图组件
+
 ```javascript
 // packages/react-simulator-renderer/src/renderer-view.tsx
 class Renderer extends Component {
@@ -98,6 +102,7 @@ class Renderer extends Component {
 ```
 
 #### 步骤3：LowCodeRenderer 处理
+
 ```javascript
 // packages/renderer-core/src/renderer/renderer.tsx
 export default function rendererFactory(): IRenderComponent {
@@ -137,6 +142,7 @@ export default function rendererFactory(): IRenderComponent {
 ```
 
 #### 步骤4：BaseRenderer 处理组件树
+
 ```javascript
 // packages/renderer-core/src/renderer/base.tsx
 class BaseRenderer extends Component {
@@ -221,6 +227,7 @@ class BaseRenderer extends Component {
 ## Schema 结构与渲染规则
 
 ### Schema 基本结构
+
 ```javascript
 {
     componentName: 'Page',         // 组件名称
@@ -253,6 +260,7 @@ class BaseRenderer extends Component {
 ### 渲染规则
 
 #### 1. 组件查找规则
+
 ```javascript
 // 查找优先级
 const allComponents = {
@@ -266,6 +274,7 @@ let Comp = allComponents[componentName] ||
 ```
 
 #### 2. 属性解析规则
+
 - **JSExpression**：解析为 JavaScript 表达式
 - **JSFunction**：解析为函数
 - **JSSlot**：解析为插槽内容
@@ -273,6 +282,7 @@ let Comp = allComponents[componentName] ||
 - **普通值**：直接传递
 
 #### 3. 循环渲染（loop）
+
 ```javascript
 // Schema 中的 loop 配置
 {
@@ -295,6 +305,7 @@ let Comp = allComponents[componentName] ||
 ```
 
 #### 4. 条件渲染（condition）
+
 ```javascript
 {
     componentName: 'Alert',
@@ -309,11 +320,14 @@ let Comp = allComponents[componentName] ||
 ## 设计态特殊处理
 
 ### 1. 组件包装（HOC）
+
 设计态下，组件会被高阶组件（HOC）包装，添加额外功能：
+
 - **Leaf HOC**：添加选中、悬停等交互能力
 - **compWrapper**：处理组件实例引用
 
 ### 2. 自定义 createElement
+
 ```javascript
 customCreateElement: (Component, props, children) => {
     // 获取组件元数据
@@ -338,7 +352,9 @@ customCreateElement: (Component, props, children) => {
 ```
 
 ### 3. 事件处理
+
 设计态下的事件会被拦截和处理：
+
 ```javascript
 // 设计态不执行真实的事件处理函数
 if (designMode === 'design') {
@@ -353,6 +369,7 @@ if (designMode === 'design') {
 ## 数据源与状态管理
 
 ### 1. 数据源初始化
+
 ```javascript
 __initDataSource(props) {
     const schema = props.__schema;
@@ -371,6 +388,7 @@ __initDataSource(props) {
 ```
 
 ### 2. 状态管理
+
 - **组件状态**：通过 this.state 管理
 - **全局状态**：通过 appHelper 共享
 - **数据源状态**：通过 dataSourceMap 管理
@@ -378,14 +396,17 @@ __initDataSource(props) {
 ## 性能优化
 
 ### 1. 组件缓存
+
 - 使用 `__instanceMap` 缓存组件实例
 - 避免重复创建相同组件
 
 ### 2. 条件渲染优化
+
 - 提前判断条件，避免无效渲染
 - 使用 `shouldComponentUpdate` 控制更新
 
 ### 3. Schema 变化检测
+
 ```javascript
 getSchemaChangedSymbol = () => {
     return this.schemaChangedSymbol;
@@ -400,22 +421,26 @@ if (schemaChanged) {
 ## 注意事项
 
 ### 1. 组件库要求
+
 - 组件必须在 iframe 内可访问
 - 组件名称必须与 Schema 中的 componentName 对应
 - 支持 React 组件和低代码组件
 
 ### 2. 表达式安全
+
 - JSExpression 在沙箱环境中执行
 - 避免直接访问 window 对象
 - 使用 this 访问组件上下文
 
 ### 3. 生命周期执行
+
 - constructor：组件创建时
 - componentDidMount：组件挂载后
 - componentDidUpdate：组件更新后
 - componentWillUnmount：组件卸载前
 
 ### 4. 错误处理
+
 - 组件渲染错误会被 FaultComponent 捕获
 - 组件未找到会显示 NotFoundComponent
 - 表达式执行错误会记录日志
@@ -423,6 +448,7 @@ if (schemaChanged) {
 ## 扩展机制
 
 ### 1. 自定义渲染器
+
 ```javascript
 // 注册自定义渲染器
 adapter.setRenderers({
@@ -431,6 +457,7 @@ adapter.setRenderers({
 ```
 
 ### 2. 自定义组件
+
 ```javascript
 // 注册自定义组件
 const components = {
@@ -440,6 +467,7 @@ const components = {
 ```
 
 ### 3. 自定义 HOC
+
 ```javascript
 // 添加自定义高阶组件
 this.__componentHOCs.push(myCustomHOC);

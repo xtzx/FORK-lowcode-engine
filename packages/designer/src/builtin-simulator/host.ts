@@ -1077,45 +1077,65 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
     this.emitter.emit(eventName, ...data);
   }
 
+  /**
+   * 🖱️ 设置拖拽和点击事件处理
+   * 这是设计态事件拦截的核心实现，在捕获阶段监听所有鼠标事件
+   * 并将其转换为设计器的选择、拖拽等操作
+   */
   setupDragAndClick() {
     const { designer } = this;
     const doc = this.contentDocument!;
 
     // TODO: think of lock when edit a node
-    // 事件路由
+    // 🎯 事件路由核心：在捕获阶段监听鼠标事件，优先级高于组件的事件处理
     doc.addEventListener(
       'mousedown',
       (downEvent: MouseEvent) => {
-        // fix for popups close logic
+        // 🔄 修复弹窗关闭逻辑：同步主文档的鼠标事件
         document.dispatchEvent(new Event('mousedown'));
+
+        // 📝 获取当前文档模型，检查编辑状态
         const documentModel = this.project.currentDocument;
         if (this.liveEditing.editing || !documentModel) {
-          return;
+          return;  // 如果正在实时编辑或无文档，直接返回
         }
+
         const { selection } = documentModel;
         let isMulti = false;
+
+        // 🎯 设计态下的事件拦截和处理
         if (this.designMode === 'design') {
+          // 检查是否为多选模式（Cmd/Ctrl + 点击）
           isMulti = downEvent.metaKey || downEvent.ctrlKey;
         } else if (!downEvent.metaKey) {
-          return;
+          return;  // 非设计态且无Meta键，不处理
         }
         // FIXME: dirty fix remove label-for fro liveEditing
         downEvent.target?.removeAttribute('for');
+
+        // 🎯 获取目标节点：从 DOM 元素反向查找对应的设计器节点
         const nodeInst = this.getNodeInstanceFromElement(downEvent.target);
         const { focusNode } = documentModel;
         const node = getClosestClickableNode(nodeInst?.node || focusNode, downEvent);
+
         // 如果找不到可点击的节点，直接返回
         if (!node) {
           return;
         }
-        // 触发 onMouseDownHook 钩子
+
+        // 🎯 触发组件自定义的鼠标事件钩子
         const onMouseDownHook = node.componentMeta.advanced.callbacks?.onMouseDownHook;
         if (onMouseDownHook) {
           onMouseDownHook(downEvent, node.internalToShellNode());
         }
 
-        // 断开
+        // 🚨 关键点：这里就是设计态事件拦截的核心
+        // 原始的 onClick 等事件不会被执行，而是被转换为设计器的选择操作
 
+        // 🔗 事件传播断开点：从这里开始，事件不再按原始的业务逻辑执行
+        // 而是转换为设计器的拖拽、选择等操作
+
+        // 🧩 检查是否为 RGL（React Grid Layout）容器节点
         const rglNode = node?.getParent();
         const isRGLNode = rglNode?.isRGLContainer;
         if (isRGLNode) {
@@ -1237,25 +1257,33 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
           '.next-rating',
           '.next-select',
           '.next-switch',
-          '.next-time-picker',
-          '.next-upload',
-          '.next-year-picker',
-          '.next-breadcrumb-item',
-          '.next-calendar-header',
-          '.next-calendar-table',
-          '.editor-container', // 富文本组件
+          '.next-time-picker',        // 时间选择器
+          '.next-upload',             // 上传组件
+          '.next-year-picker',        // 年份选择器
+          '.next-breadcrumb-item',    // 面包屑导航项
+          '.next-calendar-header',    // 日历头部
+          '.next-calendar-table',     // 日历表格
+          '.editor-container',        // 富文本编辑器容器
         ];
+
+        // 🔗 获取最终的忽略选择器列表（支持自定义函数动态计算）
         const ignoreSelectors = customizeIgnoreSelectors?.(defaultIgnoreSelectors, e) || defaultIgnoreSelectors;
         const ignoreSelectorsString = ignoreSelectors.join(',');
-        // 提供了 customizeIgnoreSelectors 的情况下，忽略 isFormEvent() 判断
+
+        // 🚫 设计态事件拦截核心逻辑：这就是你提到的事件拦截实现！
+        // 条件：1. 非自定义选择器且是表单事件 或 2. 目标元素在忽略列表中
         if ((!customizeIgnoreSelectors && isFormEvent(e)) || target?.closest(ignoreSelectorsString)) {
-          e.preventDefault();
-          e.stopPropagation();
+          e.preventDefault();    // 阻止默认行为（如表单提交、链接跳转）
+          e.stopPropagation();   // 阻止事件冒泡，防止触发设计器的选择逻辑
         }
+        // 💡 效果说明：
+        // 在设计态下，上述组件的 onClick 等事件不会执行原始的业务逻辑，
+        // 而是被设计器拦截并转换为选择、拖拽等设计操作
+
         // stop response document click event
         // todo: catch link redirect
       },
-      true,
+      true,  // 👍 捕获阶段监听，优先级高于组件自定义事件处理器
     );
   }
 
