@@ -990,7 +990,13 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
     const renderer = await createSimulator(this, iframe, vendors);
 
     // TODO: !!! 思考重载机制的实现
+    //       当组件库或环境配置发生变化时，是否需要完全重新创建iframe
+    //       还是可以通过动态加载资源的方式实现热更新
     // TODO: 考虑 iframe reload 时的处理逻辑
+    //       iframe重载会丢失所有事件监听器和状态，需要：
+    //       1. 检测iframe重载事件
+    //       2. 重新绑定所有事件监听器
+    //       3. 恢复之前的渲染状态和选中状态
 
     // ========================================
     // ⏳ 资源等待阶段：确保所有必要资源已准备就绪
@@ -1048,32 +1054,104 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
     clipboard.injectCopyPaster(this._contentDocument);
 
     // TODO: 实现绑定的清理机制，避免内存泄漏
-    // TODO: dispose the bindings
+    //       需要清理的资源包括：
+    //       1. 快捷键绑定 (innerHotkey.unmount)
+    //       2. 焦点追踪器 (focusTracker.unmount)
+    //       3. 剪贴板注入功能的解绑
+    //       4. 所有事件监听器的移除
+    //       建议在 purge() 方法中实现完整的清理逻辑
   }
 
+  /**
+   * ========================================
+   * 🔧 动态组件库设置 - 运行时组件库更新
+   * ========================================
+   *
+   * 在 iframe 渲染器已经初始化后，动态加载新的组件库配置
+   * 这个方法支持在运行时更新可用的组件库，而无需重新创建 iframe
+   *
+   * 🔄 执行流程：
+   * 1. 📦 构建组件库资源包：将库配置转换为可加载的资源
+   * 2. 🎭 渲染器资源加载：将资源包注入到 iframe 内的渲染器
+   * 3. ⏰ 异步库处理：处理需要延迟加载的组件库
+   * 4. 🧹 清理映射表：移除已加载的异步库配置
+   *
+   * 💡 使用场景：
+   * - 动态切换组件库版本
+   * - 按需加载额外的组件库
+   * - 开发时的热更新组件库
+   *
+   * @param library - 新的组件库配置列表
+   * @returns Promise<void> - 异步加载完成
+   */
   async setupComponents(library: LibraryItem[]) {
+    // 📦 构建新的组件库资源包：使用传入的库配置生成资源列表
     const libraryAsset: AssetList = this.buildLibrary(library);
+
+    // 🎭 向渲染器加载资源：将新的组件库资源注入到 iframe 内
     await this.renderer?.load(libraryAsset);
+
+    // ⏰ 处理异步加载的组件库：检查是否有需要延迟加载的库
     if (Object.keys(this.asyncLibraryMap).length > 0) {
-      // 加载异步 Library
+      // 🔄 加载异步组件库：在基础环境就绪后加载异步依赖
       await this.renderer?.loadAsyncLibrary(this.asyncLibraryMap);
+
+      // 🧹 清理异步库映射表：避免重复加载，释放内存
       Object.keys(this.asyncLibraryMap).forEach((key) => {
         delete this.asyncLibraryMap[key];
       });
     }
   }
 
+  /**
+   * ========================================
+   * 🎮 事件系统初始化 - 建立完整的用户交互能力
+   * ========================================
+   *
+   * 初始化所有与用户交互相关的事件监听器和处理逻辑
+   * 这是设计器交互功能的核心入口，建立设计态的所有交互能力
+   *
+   * 🎯 初始化的交互系统：
+   * 1. 🖱️ 拖拽和点击：组件选择、拖拽移动、多选等基础交互
+   * 2. 🔍 悬停检测：鼠标悬停时的组件高亮和边框显示
+   * 3. ✏️ 实时编辑：双击进入文本编辑模式的功能
+   * 4. 📋 右键菜单：上下文菜单的显示和处理
+   *
+   * ⚠️ 注意事项：
+   * - 这些事件监听器直接绑定在 iframe 的 document 上
+   * - 在捕获阶段拦截原生事件，转换为设计器操作
+   * - TODO: 考虑将事件控制迁移到 simulator renderer 内部
+   * - TODO: iframe 重载时需要重新绑定事件监听器
+   */
   setupEvents() {
-    // TODO: Thinkof move events control to simulator renderer
-    //       just listen special callback
-    // because iframe maybe reload
+    // TODO: 考虑将事件控制逻辑迁移到 simulator renderer
+    //       只监听特定的回调函数，因为 iframe 可能会重新加载
+    //       这样可以简化事件管理和清理逻辑
+
+    // 🖱️ 设置拖拽和点击事件处理：核心的组件选择和拖拽功能
     this.setupDragAndClick();
+
+    // 🔍 设置悬停检测事件处理：鼠标悬停时的组件高亮功能
     this.setupDetecting();
+
+    // ✏️ 设置实时编辑事件处理：双击进入文本编辑的功能
     this.setupLiveEditing();
+
+    // 📋 设置右键菜单事件处理：上下文菜单的显示和处理
     this.setupContextMenu();
   }
 
+  /**
+   * 📡 发布事件 - 模拟器内部事件广播
+   *
+   * 通过模拟器内部的事件总线发布事件，实现模块间的解耦通信
+   * 主要用于模拟器内部各组件之间的消息传递和状态同步
+   *
+   * @param eventName - 事件名称，用于标识事件类型
+   * @param data - 事件携带的数据参数，支持任意数量的参数
+   */
   postEvent(eventName: string, ...data: any[]) {
+    // 📤 通过内部事件总线发布事件：使用 emitter 广播事件给所有监听器
     this.emitter.emit(eventName, ...data);
   }
 
@@ -1087,6 +1165,10 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
     const doc = this.contentDocument!;
 
     // TODO: think of lock when edit a node
+    //       考虑在节点进入编辑状态时加锁机制：
+    //       1. 防止在编辑过程中触发拖拽操作
+    //       2. 锁定状态下禁用某些鼠标事件
+    //       3. 编辑完成后自动解锁
     // 🎯 事件路由核心：在捕获阶段监听鼠标事件，优先级高于组件的事件处理
     doc.addEventListener(
       'mousedown',
@@ -1097,7 +1179,7 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
         // 📝 获取当前文档模型，检查编辑状态
         const documentModel = this.project.currentDocument;
         if (this.liveEditing.editing || !documentModel) {
-          return;  // 如果正在实时编辑或无文档，直接返回
+          return; // 如果正在实时编辑或无文档，直接返回
         }
 
         const { selection } = documentModel;
@@ -1108,13 +1190,15 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
           // 检查是否为多选模式（Cmd/Ctrl + 点击）
           isMulti = downEvent.metaKey || downEvent.ctrlKey;
         } else if (!downEvent.metaKey) {
-          return;  // 非设计态且无Meta键，不处理
+          return; // 非设计态且无Meta键，不处理
         }
-        // FIXME: dirty fix remove label-for fro liveEditing
-        downEvent.target?.removeAttribute('for');
+        // FIXME: dirty fix remove label-for from liveEditing
+        //        移除label标签的for属性，防止意外触发表单关联行为
+        //        这是临时修复方案，需要找到更优雅的解决方案
+(downEvent.target as HTMLElement)?.removeAttribute?.('for');
 
         // 🎯 获取目标节点：从 DOM 元素反向查找对应的设计器节点
-        const nodeInst = this.getNodeInstanceFromElement(downEvent.target);
+        const nodeInst = this.getNodeInstanceFromElement(downEvent.target as Element);
         const { focusNode } = documentModel;
         const node = getClosestClickableNode(nodeInst?.node || focusNode, downEvent);
 
@@ -1139,40 +1223,51 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
         const rglNode = node?.getParent();
         const isRGLNode = rglNode?.isRGLContainer;
         if (isRGLNode) {
-          // 如果拖拽的是磁铁块的右下角 handle，则直接跳过
-          if (downEvent.target?.classList.contains('react-resizable-handle')) return;
-          // 禁止多选
+          // 🎯 跳过拖拽调整尺寸的handle：如果拖拽的是磁铁块的右下角 handle，则直接跳过
+          //    react-resizable-handle 是React Grid Layout的尺寸调整控制点
+          if ((downEvent.target as HTMLElement)?.classList?.contains('react-resizable-handle')) return;
+          // 🚫 RGL模式下禁止多选：磁铁块模式下不支持多选操作，简化交互逻辑
           isMulti = false;
           designer.dragon.emitter.emit('rgl.switch', {
             action: 'start',
             rglNode,
           });
         } else {
-          // stop response document focus event
-          // 禁止原生拖拽
-          downEvent.stopPropagation();
-          downEvent.preventDefault();
+          // 🚫 阻止文档焦点事件响应：防止iframe外的焦点逻辑干扰
+          // 🚫 禁止原生拖拽：阻止浏览器默认的拖拽行为，使用自定义拖拽逻辑
+          downEvent.stopPropagation(); // 阻止事件冒泡到上级元素
+          downEvent.preventDefault(); // 阻止浏览器默认行为
         }
         // if (!node?.isValidComponent()) {
         //   // 对于未注册组件直接返回
         //   return;
         // }
+        // 🖱️ 检查是否为左键点击：只有左键点击才触发选择和拖拽逻辑
         const isLeftButton = downEvent.which === 1 || downEvent.button === 0;
+
+        // 🎯 选择检查回调：在鼠标抬起时判断是选择还是拖拽
         const checkSelect = (e: MouseEvent) => {
+          // 🧹 清理事件监听器：避免重复触发
           doc.removeEventListener('mouseup', checkSelect, true);
-          // 取消移动;
+          // 🔚 取消RGL移动模式：通知拖拽系统结束移动状态
           designer.dragon.emitter.emit('rgl.switch', {
             action: 'end',
             rglNode,
           });
-          // 鼠标是否移动 ? - 鼠标抖动应该也需要支持选中事件，偶尔点击不能选中，磁帖块移除 shaken 检测
+          // 📏 检查鼠标是否发生有效移动：
+          //    - 鼠标抖动不应影响选中事件，确保点击的可靠性
+          //    - 磁铁块(RGL)移除抖动检测，提升响应性
           if (!isShaken(downEvent, e) || isRGLNode) {
             let { id } = node;
             designer.activeTracker.track({ node, instance: nodeInst?.instance });
             if (isMulti && focusNode && !node.contains(focusNode) && selection.has(id)) {
               selection.remove(id);
             } else {
-              // TODO: 避免选中 Page 组件，默认选中第一个子节点；新增规则 或 判断 Live 模式
+              // TODO: 避免选中 Page 组件，默认选中第一个子节点
+              //       在Live模式下，Page组件通常不应该被直接选中
+              //       因为它代表整个页面容器，选中意义不大
+              //       建议：1. 增加配置项控制此行为
+              //            2. 根据不同模式应用不同的选择策略
               if (node.isPage() && node.getChildren()?.notEmpty() && this.designMode === 'live') {
                 const firstChildId = node.getChildren()?.get(0)?.getId();
                 if (firstChildId) id = firstChildId;
@@ -1243,6 +1338,11 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
 
         const customizeIgnoreSelectors = engineConfig.get('customizeIgnoreSelectors');
         // TODO: need more elegant solution to ignore click events of components in designer
+        //       当前的实现通过CSS选择器硬编码来忽略特定组件的点击事件
+        //       更优雅的解决方案：
+        //       1. 在组件元数据中定义 ignoreClick 属性
+        //       2. 支持动态的忽略规则配置
+        //       3. 提供组件级别的事件拦截钩子函数
         const defaultIgnoreSelectors: string[] = [
           '.next-input-group',
           '.next-checkbox-group',
@@ -1257,13 +1357,13 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
           '.next-rating',
           '.next-select',
           '.next-switch',
-          '.next-time-picker',        // 时间选择器
-          '.next-upload',             // 上传组件
-          '.next-year-picker',        // 年份选择器
-          '.next-breadcrumb-item',    // 面包屑导航项
-          '.next-calendar-header',    // 日历头部
-          '.next-calendar-table',     // 日历表格
-          '.editor-container',        // 富文本编辑器容器
+          '.next-time-picker', // 时间选择器
+          '.next-upload', // 上传组件
+          '.next-year-picker', // 年份选择器
+          '.next-breadcrumb-item', // 面包屑导航项
+          '.next-calendar-header', // 日历头部
+          '.next-calendar-table', // 日历表格
+          '.editor-container', // 富文本编辑器容器
         ];
 
         // 🔗 获取最终的忽略选择器列表（支持自定义函数动态计算）
@@ -1272,23 +1372,45 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
 
         // 🚫 设计态事件拦截核心逻辑：这就是你提到的事件拦截实现！
         // 条件：1. 非自定义选择器且是表单事件 或 2. 目标元素在忽略列表中
-        if ((!customizeIgnoreSelectors && isFormEvent(e)) || target?.closest(ignoreSelectorsString)) {
-          e.preventDefault();    // 阻止默认行为（如表单提交、链接跳转）
-          e.stopPropagation();   // 阻止事件冒泡，防止触发设计器的选择逻辑
+        if ((!customizeIgnoreSelectors && isFormEvent(e)) || (target as Element)?.closest?.(ignoreSelectorsString)) {
+          e.preventDefault(); // 阻止默认行为（如表单提交、链接跳转）
+          e.stopPropagation(); // 阻止事件冒泡，防止触发设计器的选择逻辑
         }
         // 💡 效果说明：
         // 在设计态下，上述组件的 onClick 等事件不会执行原始的业务逻辑，
         // 而是被设计器拦截并转换为选择、拖拽等设计操作
 
-        // stop response document click event
-        // todo: catch link redirect
+        // 🚫 阻止响应主文档的点击事件，防止iframe外的逻辑干扰
+        // TODO: catch link redirect
+        //       需要捕获并处理iframe内的链接重定向
+        //       防止意外的页面跳转影响编辑器状态：
+        //       1. 拦截所有<a>标签的默认跳转行为
+        //       2. 在设计态下提供链接预览而非跳转
+        //       3. 在预览模式下允许正常跳转
       },
-      true,  // 👍 捕获阶段监听，优先级高于组件自定义事件处理器
+      true, // 👍 捕获阶段监听，优先级高于组件自定义事件处理器
     );
   }
 
   /**
-   * 设置悬停处理
+   * ========================================
+   * 🔍 设置悬停检测 - 鼠标悬停组件高亮系统
+   * ========================================
+   *
+   * 建立鼠标悬停时的组件检测和高亮显示功能
+   * 当鼠标在 iframe 内移动时，实时检测当前悬停的组件并高亮显示
+   *
+   * 🎯 核心功能：
+   * 1. 🎯 实时组件检测：mouseover 时从 DOM 元素映射到低代码节点
+   * 2. 🎨 视觉高亮反馈：通过 detecting.capture 显示组件边框
+   * 3. 📍 焦点节点优先：优先显示当前焦点节点的高亮
+   * 4. 🔚 离开清理：mouseleave 时清除高亮状态
+   * 5. 🚫 事件传播控制：根据配置决定是否阻止事件冒泡
+   *
+   * ⚠️ 注意事项：
+   * - 只在设计模式(design)下生效
+   * - 拖拽进行时会阻止鼠标事件传播
+   * - 悬停检测的启用状态由 detecting.enable 控制
    */
   setupDetecting() {
     const doc = this.contentDocument!;
@@ -1338,9 +1460,30 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
     // };
   }
 
+  /**
+   * ========================================
+   * ✏️ 设置实时编辑 - 双击进入文本编辑模式
+   * ========================================
+   *
+   * 建立双击组件进入实时编辑模式的功能
+   * 允许用户直接在画布上编辑文本内容，而不需要在属性面板中修改
+   *
+   * 🎯 核心功能：
+   * 1. 🖱️ 双击检测：监听 iframe 内的 dblclick 事件
+   * 2. 🎯 目标验证：检查双击的元素是否支持实时编辑
+   * 3. 📍 节点映射：从 DOM 元素找到对应的低代码节点
+   * 4. 🚫 过滤检查：排除低代码组件和不支持编辑的节点
+   * 5. 📐 根元素查找：定位组件的根 DOM 元素
+   * 6. ✏️ 编辑激活：启动实时编辑功能
+   *
+   * ⚠️ 限制条件：
+   * - 只支持原生 HTML 元素的文本编辑
+   * - 不支持低代码组件的直接编辑
+   * - 需要找到包含目标元素的根元素
+   */
   setupLiveEditing() {
     const doc = this.contentDocument!;
-    // cause edit
+    // 🎯 监听双击事件：用于触发实时编辑功能
     doc.addEventListener(
       'dblclick',
       (e: MouseEvent) => {
@@ -1403,8 +1546,31 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
     // }
   }
 
+  /**
+   * ========================================
+   * 📋 设置右键菜单 - 上下文菜单交互系统
+   * ========================================
+   *
+   * 建立右键点击时的上下文菜单功能
+   * 当用户在 iframe 内右键点击时，收集点击位置的组件信息并发布菜单事件
+   *
+   * 🎯 核心功能：
+   * 1. 🖱️ 右键检测：监听 iframe 内的 contextmenu 事件
+   * 2. 📍 节点映射：从点击的 DOM 元素找到对应的低代码节点
+   * 3. 📦 信息收集：收集组件名称、实例、位置等上下文信息
+   * 4. 📡 事件发布：通过编辑器事件总线发布右键菜单事件
+   * 5. 🎯 焦点处理：优先使用当前焦点节点信息
+   *
+   * 📤 发布的事件数据：
+   * - selected: 组件标识（包名-组件名）
+   * - node: 低代码节点实例
+   * - instance: React 组件实例
+   * - instanceRect: 组件的位置和尺寸信息
+   * - originalEvent: 原始的鼠标事件对象
+   */
   setupContextMenu() {
     const doc = this.contentDocument!;
+    // 🖱️ 监听右键菜单事件：用于显示上下文菜单
     doc.addEventListener('contextmenu', (e: MouseEvent) => {
       const targetElement = e.target as HTMLElement;
       const nodeInst = this.getNodeInstanceFromElement(targetElement);
@@ -1540,68 +1706,135 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
   }
 
   /**
-   * @see ISimulator
+   * ========================================
+   * 📐 计算组件实例矩形区域 - 核心几何计算方法
+   * ========================================
+   *
+   * 计算组件实例在 iframe 画布中的精确矩形边界
+   * 这是拖拽系统、选中效果、组件定位的核心算法
+   *
+   * 🎯 核心功能：
+   * 1. 🔍 DOM元素查找：根据选择器找到组件的所有DOM元素
+   * 2. 📏 矩形获取：获取每个元素的所有ClientRect（处理换行、分段等复杂布局）
+   * 3. 🧮 边界计算：计算所有矩形的最小外接矩形（bounding box）
+   * 4. 🎨 结果封装：返回标准化的矩形对象，包含元素引用和计算标志
+   *
+   * 🔄 算法流程：
+   * 1. 查找组件的所有DOM元素（可能有多个，如文本换行、表格等）
+   * 2. 遍历每个元素，获取其所有ClientRect
+   * 3. 跳过无效矩形（宽高为0）
+   * 4. 计算所有有效矩形的联合边界
+   * 5. 返回最终的矩形区域
+   *
+   * 💡 适用场景：
+   * - 🎯 拖拽时显示组件轮廓
+   * - 📍 右键菜单位置计算
+   * - 🔲 组件选中框绘制
+   * - 📐 碰撞检测和位置计算
+   *
+   * ⚠️ 特殊处理：
+   * - 支持换行文本的多个矩形合并
+   * - 过滤无效的0尺寸矩形
+   * - 处理浮动和绝对定位元素
+   * - 兼容复杂CSS布局（Grid、Flexbox等）
+   *
+   * @param instance - React组件实例，用于查找对应的DOM元素
+   * @param selector - 可选的CSS选择器，用于精确定位特定子元素
+   * @returns IPublicTypeRect | null - 计算得到的矩形区域，失败返回null
+   *
+   * @see ISimulator.computeComponentInstanceRect
    */
   computeComponentInstanceRect(instance: IPublicTypeComponentInstance, selector?: string): IPublicTypeRect | null {
+    // 🎭 获取渲染器实例：用于DOM操作和坐标计算
     const renderer = this.renderer!;
+
+    // 🔍 查找组件的DOM元素：根据实例和选择器找到所有相关DOM节点
     const elements = this.findDOMNodes(instance, selector);
     if (!elements) {
+      // 📍 元素查找失败：组件可能未渲染或已卸载
       return null;
     }
 
-    const elems = elements.slice();
-    let rects: DOMRect[] | undefined;
-    let last: { x: number; y: number; r: number; b: number } | undefined;
-    let _computed = false;
+    // 📦 准备计算数据结构
+    const elems = elements.slice(); // 复制元素数组，避免修改原数组
+    let rects: DOMRect[] | undefined; // 当前元素的所有ClientRect
+    let last: { x: number; y: number; r: number; b: number } | undefined; // 累计的边界框
+    let _computed = false; // 标记是否进行了多矩形合并计算
+
+    // 🔄 遍历所有元素和它们的矩形
     while (true) {
+      // 📏 获取下一批矩形数据
       if (!rects || rects.length < 1) {
+        // 🎯 处理下一个元素
         const elem = elems.pop();
         if (!elem) {
+          // ✅ 所有元素处理完毕，退出循环
           break;
         }
+        // 📐 获取元素的所有ClientRect（处理换行、多行文本等）
         rects = renderer.getClientRects(elem);
       }
+
+      // 🔍 处理下一个矩形
       const rect = rects.pop();
       if (!rect) {
+        // 当前元素的矩形处理完毕，继续下一个元素
         break;
       }
+
+      // 🚫 跳过无效矩形：0宽度或0高度的矩形（通常是隐藏或空元素）
       if (rect.width === 0 && rect.height === 0) {
         continue;
       }
+
       if (!last) {
+        // 🎯 初始化边界框：使用第一个有效矩形作为基准
         last = {
-          x: rect.left,
-          y: rect.top,
-          r: rect.right,
-          b: rect.bottom,
+          x: rect.left,   // 左边界
+          y: rect.top,    // 上边界
+          r: rect.right,  // 右边界
+          b: rect.bottom, // 下边界
         };
         continue;
       }
+
+      // 🧮 更新边界框：扩展到包含当前矩形
       if (rect.left < last.x) {
-        last.x = rect.left;
-        _computed = true;
+        last.x = rect.left; // 扩展左边界
+        _computed = true;   // 标记进行了合并计算
       }
       if (rect.top < last.y) {
-        last.y = rect.top;
+        last.y = rect.top;  // 扩展上边界
         _computed = true;
       }
       if (rect.right > last.r) {
-        last.r = rect.right;
+        last.r = rect.right; // 扩展右边界
         _computed = true;
       }
       if (rect.bottom > last.b) {
-        last.b = rect.bottom;
+        last.b = rect.bottom; // 扩展下边界
         _computed = true;
       }
     }
 
+    // 📦 构建最终结果
     if (last) {
-      const r: IPublicTypeRect = new DOMRect(last.x, last.y, last.r - last.x, last.b - last.y);
-      r.elements = elements;
-      r.computed = _computed;
-      return r;
+      // 🎯 创建标准DOMRect对象
+      const r: IPublicTypeRect = new DOMRect(
+        last.x,              // x坐标（左边界）
+        last.y,              // y坐标（上边界）
+        last.r - last.x,     // 宽度
+        last.b - last.y      // 高度
+      );
+
+      // 📋 附加元数据
+      r.elements = elements;   // 关联的DOM元素列表
+      r.computed = _computed;  // 是否进行了多矩形合并
+
+      return r; // 返回计算结果
     }
 
+    // ❌ 没有找到有效矩形
     return null;
   }
 
@@ -1706,34 +1939,78 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
   }
 
   /**
-   * @see IPublicModelSensor
+   * ========================================
+   * 🔧 事件对象修复 - 跨iframe事件处理核心方法
+   * ========================================
+   *
+   * 修复和标准化定位事件对象，确保跨iframe的事件处理正确性
+   * 这是拖拽系统在主窗口和iframe之间协调工作的关键机制
+   *
+   * 🎯 核心功能：
+   * 1. 🌍 坐标系转换：将全局坐标转换为iframe内的画布坐标
+   * 2. 🎯 目标元素修正：确定事件的真实目标DOM元素
+   * 3. ✅ 重复处理防护：避免多次修复同一事件对象
+   * 4. 🔍 跨框架兼容：处理主窗口和iframe之间的坐标差异
+   *
+   * 🔄 修复流程：
+   * 1. 检查事件是否已修复，避免重复处理
+   * 2. 判断事件来源（主窗口 vs iframe）
+   * 3. 转换全局坐标到画布坐标系
+   * 4. 基于画布坐标重新定位目标元素
+   * 5. 标记事件已修复
+   *
+   * 💡 应用场景：
+   * - 🖱️ 鼠标拖拽跨iframe边界
+   * - 🎯 组件定位和选择
+   * - 📍 右键菜单位置计算
+   * - 🔍 悬停检测和高亮
+   *
+   * ⚠️ 关键问题解决：
+   * - iframe与主窗口的坐标系差异
+   * - 不同浏览器的事件对象兼容性
+   * - 拖拽过程中的坐标连续性
+   * - 视口缩放和滚动的影响
+   *
+   * @param e - 需要修复的定位事件对象
+   * @returns ILocateEvent - 修复后的事件对象
+   *
+   * @see IPublicModelSensor.fixEvent
    */
   fixEvent(e: ILocateEvent): ILocateEvent {
+    // ✅ 重复处理检查：如果事件已经修复过，直接返回
     if (e.fixed) {
-      return e;
+      return e; // 避免重复修复，提升性能
     }
 
+    // 🌍 判断事件来源：检查事件是否来自当前iframe
     const notMyEvent = e.originalEvent.view?.document !== this.contentDocument;
-    // fix canvasX canvasY : 当前激活文档画布坐标系
+
+    // 📐 坐标系修复：fix canvasX canvasY - 转换到当前激活文档的画布坐标系
     if (notMyEvent || !('canvasX' in e) || !('canvasY' in e)) {
+      // 🔄 坐标转换：将全局坐标转换为iframe内的局部坐标
       const l = this.viewport.toLocalPoint({
-        clientX: e.globalX,
-        clientY: e.globalY,
+        clientX: e.globalX, // 全局X坐标（相对于主窗口）
+        clientY: e.globalY, // 全局Y坐标（相对于主窗口）
       });
-      e.canvasX = l.clientX;
-      e.canvasY = l.clientY;
+
+      // 📍 设置画布坐标：iframe内部的相对坐标
+      e.canvasX = l.clientX; // 画布X坐标
+      e.canvasY = l.clientY; // 画布Y坐标
     }
 
-    // fix target : 浏览器事件响应目标
+    // 🎯 目标元素修复：fix target - 重新定位浏览器事件响应目标
     if (!e.target || notMyEvent) {
+      // 📍 基于画布坐标重新查找目标元素
       if (!isNaN(e.canvasX!) && !isNaN(e.canvasY!)) {
+        // 🔍 使用elementFromPoint在iframe文档中查找指定坐标的元素
         e.target = this.contentDocument?.elementFromPoint(e.canvasX!, e.canvasY!);
       }
     }
 
-    // 事件已订正
+    // ✅ 标记事件已修复：防止重复处理
     e.fixed = true;
-    return e;
+
+    return e; // 返回修复后的事件对象
   }
 
   /**
@@ -2240,64 +2517,223 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
   // #endregion
 }
 
+/**
+ * 🏷️ HTML 标签名称验证
+ *
+ * 检查给定的字符串是否为有效的 HTML 标签名称
+ * 用于区分自定义组件和原生 HTML 元素
+ *
+ * 📝 验证规则：
+ * - 必须以小写字母开头
+ * - 后续字符可以是字母、数字或下划线
+ * - 符合 HTML 标签的命名规范
+ *
+ * @param name - 要验证的组件/标签名称
+ * @returns boolean - true表示是有效的HTML标签名，false表示是自定义组件
+ *
+ * @example
+ * isHTMLTag('div')     // true - 原生HTML元素
+ * isHTMLTag('span')    // true - 原生HTML元素
+ * isHTMLTag('Button')  // false - 自定义组件（大写开头）
+ * isHTMLTag('my-comp') // false - 包含连字符的自定义组件
+ */
 function isHTMLTag(name: string) {
   return /^[a-z]\w*$/.test(name);
 }
 
+/**
+ * 📍 点在矩形内判断
+ *
+ * 判断指定的画布坐标点是否位于给定的矩形区域内
+ * 这是拖拽定位系统中的核心几何计算函数
+ *
+ * 🎯 应用场景：
+ * - 拖拽时判断鼠标是否在目标组件内
+ * - 计算拖拽的精确投放位置
+ * - 确定组件的碰撞检测结果
+ *
+ * 📐 计算逻辑：
+ * 点在矩形内当且仅当：
+ * - X坐标在矩形左右边界之间（包含边界）
+ * - Y坐标在矩形上下边界之间（包含边界）
+ *
+ * @param point - 画布坐标点，包含 canvasX 和 canvasY 属性
+ * @param rect - 矩形区域，包含 top、bottom、left、right 边界
+ * @returns boolean - true表示点在矩形内，false表示在矩形外
+ */
 function isPointInRect(point: CanvasPoint, rect: IPublicTypeRect) {
   return (
-    point.canvasY >= rect.top &&
-    point.canvasY <= rect.bottom &&
-    point.canvasX >= rect.left &&
-    point.canvasX <= rect.right
+    point.canvasY >= rect.top && // 点的Y坐标不小于矩形顶边
+    point.canvasY <= rect.bottom && // 点的Y坐标不大于矩形底边
+    point.canvasX >= rect.left && // 点的X坐标不小于矩形左边
+    point.canvasX <= rect.right // 点的X坐标不大于矩形右边
   );
 }
 
+/**
+ * 📏 点到矩形的最短距离计算
+ *
+ * 计算画布坐标点到矩形区域的最短欧几里得距离
+ * 这是拖拽定位中寻找最近目标组件的核心算法
+ *
+ * 🎯 应用场景：
+ * - 拖拽时找到距离鼠标最近的组件
+ * - 计算组件间的空间关系
+ * - 优化拖拽目标的选择算法
+ *
+ * 📐 计算逻辑：
+ * 1. 计算点到矩形水平边的最短距离
+ * 2. 计算点到矩形垂直边的最短距离
+ * 3. 如果点在矩形的水平/垂直投影内，对应方向距离为0
+ * 4. 使用勾股定理计算最终的欧几里得距离
+ *
+ * ⚠️ 特殊情况：
+ * - 点在矩形内时，距离为0
+ * - 点在矩形的水平或垂直投影内时，距离等于到最近边的距离
+ *
+ * @param point - 画布坐标点
+ * @param rect - 矩形区域
+ * @returns number - 点到矩形的最短距离（像素）
+ */
 function distanceToRect(point: CanvasPoint, rect: IPublicTypeRect) {
+  // 🔢 计算到左右边界的最短距离
   let minX = Math.min(Math.abs(point.canvasX - rect.left), Math.abs(point.canvasX - rect.right));
+  // 🔢 计算到上下边界的最短距离
   let minY = Math.min(Math.abs(point.canvasY - rect.top), Math.abs(point.canvasY - rect.bottom));
+
+  // 🎯 如果点在矩形的水平投影内，X方向距离为0
   if (point.canvasX >= rect.left && point.canvasX <= rect.right) {
     minX = 0;
   }
+  // 🎯 如果点在矩形的垂直投影内，Y方向距离为0
   if (point.canvasY >= rect.top && point.canvasY <= rect.bottom) {
     minY = 0;
   }
 
-  return Math.sqrt(minX ** 2 + minY ** 2);
+  // 📐 使用勾股定理计算最终的欧几里得距离
+  return Math.sqrt((minX ** 2) + (minY ** 2));
 }
 
+/**
+ * 📐 点到矩形边缘的距离计算
+ *
+ * 计算画布坐标点到矩形上下边缘的距离，并判断更接近哪个边缘
+ * 主要用于确定拖拽时的插入位置（在目标前面还是后面）
+ *
+ * 🎯 应用场景：
+ * - 确定拖拽组件的插入位置
+ * - 判断应该在目标组件前面还是后面插入
+ * - 垂直布局中的位置计算
+ *
+ * 📏 计算逻辑：
+ * 1. 分别计算点到矩形顶边和底边的距离
+ * 2. 取两者中的最小值作为最短距离
+ * 3. 通过比较距离判断更接近哪个边缘
+ *
+ * @param point - 画布坐标点
+ * @param rect - 矩形区域
+ * @returns object - 包含距离和位置信息的对象
+ *   - distance: 到最近边缘的距离
+ *   - nearAfter: true表示更接近底边(after)，false表示更接近顶边(before)
+ */
 function distanceToEdge(point: CanvasPoint, rect: IPublicTypeRect) {
+  // 📏 计算到顶边的距离
   const distanceTop = Math.abs(point.canvasY - rect.top);
+  // 📏 计算到底边的距离
   const distanceBottom = Math.abs(point.canvasY - rect.bottom);
 
   return {
+    // 🎯 返回到最近边缘的距离
     distance: Math.min(distanceTop, distanceBottom),
+    // 🎯 判断是否更接近底边：true=接近底边(after)，false=接近顶边(before)
     nearAfter: distanceBottom < distanceTop,
   };
 }
 
+/**
+ * 🎯 判断点是否更接近"after"位置
+ *
+ * 根据布局方向判断拖拽点更接近目标元素的前面还是后面
+ * 这是确定组件插入位置的关键算法
+ *
+ * 🔄 布局适配：
+ * - inline=true（内联/行布局）：使用对角距离比较
+ * - inline=false（块级/列布局）：仅比较垂直距离
+ *
+ * 📐 计算逻辑：
+ * 1. 内联布局：计算点到矩形左上角和右下角的曼哈顿距离
+ *    - 如果到右下角距离更近，返回true（插入到后面）
+ * 2. 块级布局：仅比较点到顶边和底边的距离
+ *    - 如果到底边距离更近，返回true（插入到后面）
+ *
+ * 🎯 应用场景：
+ * - 水平布局中确定左右插入位置
+ * - 垂直布局中确定上下插入位置
+ * - 混合布局的智能位置判断
+ *
+ * @param point - 画布坐标点
+ * @param rect - 目标矩形区域
+ * @param inline - 是否为内联布局（行布局）
+ * @returns boolean - true表示更接近"after"位置，false表示更接近"before"位置
+ */
 function isNearAfter(point: CanvasPoint, rect: IPublicTypeRect, inline: boolean) {
   if (inline) {
+    // 🔄 内联布局：使用曼哈顿距离比较左上角和右下角
     return (
       Math.abs(point.canvasX - rect.left) + Math.abs(point.canvasY - rect.top) >
       Math.abs(point.canvasX - rect.right) + Math.abs(point.canvasY - rect.bottom)
     );
   }
+  // 📏 块级布局：仅比较垂直方向的距离
   return Math.abs(point.canvasY - rect.top) > Math.abs(point.canvasY - rect.bottom);
 }
 
+/**
+ * 🔍 选择器匹配查找
+ *
+ * 在给定的DOM元素数组中查找第一个匹配指定CSS选择器的元素
+ * 这是组件根元素查找的核心工具函数
+ *
+ * 🎯 查找策略：
+ * 1. 优先级查找：优先返回直接匹配选择器的元素
+ * 2. 后代查找：如果没有直接匹配，在第一个元素内查找后代元素
+ * 3. 类型过滤：自动过滤掉文本节点，只处理DOM元素
+ *
+ * 🔄 查找流程：
+ * 1. 遍历所有传入的元素/文本节点
+ * 2. 对于每个DOM元素，检查是否直接匹配选择器
+ * 3. 如果直接匹配，立即返回该元素
+ * 4. 如果没有直接匹配，在首个元素内使用querySelector查找
+ * 5. 最终返回找到的元素或null
+ *
+ * 📝 应用场景：
+ * - 根据 componentMeta.rootSelector 查找组件根元素
+ * - 在组件的DOM树中定位特定的目标元素
+ * - 支持复杂的CSS选择器匹配
+ *
+ * @param elements - 要搜索的DOM元素和文本节点数组
+ * @param selector - CSS选择器字符串
+ * @returns Element | null - 找到的第一个匹配元素，未找到返回null
+ */
 function getMatched(elements: Array<Element | Text>, selector: string): Element | null {
-  let firstQueried: Element | null = null;
+  let firstQueried: Element | null = null; // 缓存第一次querySelector的结果
+
+  // 🔄 遍历所有传入的节点
   for (const elem of elements) {
+    // 🔍 只处理DOM元素，跳过文本节点
     if (isElement(elem)) {
+      // 🎯 优先检查：元素本身是否匹配选择器
       if (elem.matches(selector)) {
-        return elem;
+        return elem; // 直接匹配，立即返回
       }
 
+      // 🔍 后代查找：在第一个元素内查找匹配的后代元素
       if (!firstQueried) {
         firstQueried = elem.querySelector(selector);
       }
     }
   }
+
+  // 📤 返回查找结果：直接匹配的元素 或 第一个匹配的后代元素 或 null
   return firstQueried;
 }
