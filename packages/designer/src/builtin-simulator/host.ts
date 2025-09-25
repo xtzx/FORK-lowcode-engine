@@ -1258,31 +1258,51 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
           //    - 鼠标抖动不应影响选中事件，确保点击的可靠性
           //    - 磁铁块(RGL)移除抖动检测，提升响应性
           if (!isShaken(downEvent, e) || isRGLNode) {
+            // 🎯 核心选择逻辑：处理无抖动的真实点击事件
             let { id } = node;
+
+            // 📍 激活跟踪器：记录当前活跃的节点和实例，用于高亮显示
             designer.activeTracker.track({ node, instance: nodeInst?.instance });
+
+            // 🔢 多选模式下的切换逻辑
             if (isMulti && focusNode && !node.contains(focusNode) && selection.has(id)) {
+              // 🎯 多选切换：如果节点已选中且不包含焦点节点，则从选择中移除
+              // 这实现了Ctrl+点击的切换选择行为
               selection.remove(id);
             } else {
+              // 🎯 单选或多选添加逻辑
+
               // TODO: 避免选中 Page 组件，默认选中第一个子节点
               //       在Live模式下，Page组件通常不应该被直接选中
               //       因为它代表整个页面容器，选中意义不大
               //       建议：1. 增加配置项控制此行为
               //            2. 根据不同模式应用不同的选择策略
               if (node.isPage() && node.getChildren()?.notEmpty() && this.designMode === 'live') {
+                // 🏠 Page组件特殊处理：Live模式下自动选择第一个子节点
                 const firstChildId = node.getChildren()?.get(0)?.getId();
                 if (firstChildId) id = firstChildId;
               }
+
+              // 🎯 智能选择策略：根据焦点节点关系决定选择目标
               if (focusNode) {
+                // 📍 层级判断选择：
+                // - 如果点击节点包含焦点节点，保持焦点节点选中
+                // - 如果是独立节点，选择新点击的节点
                 selection.select(node.contains(focusNode) ? focusNode.id : id);
               }
 
-              // dirty code should refector
+              // 📡 组件选择事件广播（需要重构的遗留代码）
+              // TODO: 将此逻辑重构为统一的事件系统
               const editor = this.designer?.editor;
               const npm = node?.componentMeta?.npm;
+
+              // 🏷️ 构建组件标识符：优先使用包名-组件名，其次使用组件名
               const selected =
                 [npm?.package, npm?.componentName].filter((item) => !!item).join('-') ||
                 node?.componentMeta?.componentName ||
                 '';
+
+              // 📡 发布选择事件：通知其他系统组件被选中
               editor?.eventBus.emit('designer.builtinSimulator.select', {
                 selected,
               });
@@ -1290,34 +1310,46 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
           }
         };
 
+        // 🐉 拖拽启动逻辑：处理跨焦点节点的拖拽操作
         if (isLeftButton && focusNode && !node.contains(focusNode)) {
+          // 📝 初始化拖拽节点列表：默认包含当前点击的节点
           let nodes: INode[] = [node];
-          let ignoreUpSelected = false;
+          let ignoreUpSelected = false; // 是否忽略后续的选择处理
+
           if (isMulti) {
-            // multi select mode, directily add
+            // 🔢 多选模式拖拽处理
             if (!selection.has(node.id)) {
+              // 📍 新节点加入多选：激活跟踪并添加到选择中
               designer.activeTracker.track({ node, instance: nodeInst?.instance });
               selection.add(node.id);
-              ignoreUpSelected = true;
+              ignoreUpSelected = true; // 标记忽略后续选择，避免重复处理
             }
+
+            // 🔄 清理焦点节点：多选时移除原焦点节点的选择状态
             focusNode?.id && selection.remove(focusNode.id);
-            // 获得顶层 nodes
+
+            // 🔝 获取顶层节点：多选拖拽时使用所有选中的顶层节点
             nodes = selection.getTopNodes();
           } else if (selection.containsNode(node, true)) {
+            // 🎯 单选已选中节点：如果点击的节点已在选择中，拖拽所有顶层节点
             nodes = selection.getTopNodes();
           } else {
-            // will clear current selection & select dragment in dragstart
+            // 🚀 单选新节点：拖拽系统会在 dragstart 时清理当前选择并选中拖拽目标
+            // 这里保持默认的 [node] 即可
           }
+
+          // 🐉 启动拖拽系统：boost方法会初始化拖拽状态和视觉反馈
           designer.dragon.boost(
             {
-              type: IPublicEnumDragObjectType.Node,
-              nodes,
+              type: IPublicEnumDragObjectType.Node, // 拖拽类型：节点拖拽
+              nodes, // 参与拖拽的节点列表
             },
-            downEvent,
-            isRGLNode ? rglNode : undefined,
+            downEvent, // 原始鼠标事件
+            isRGLNode ? rglNode : undefined, // RGL容器信息（如果适用）
           );
+
           if (ignoreUpSelected) {
-            // multi select mode has add selected, should return
+            // 🛑 多选模式提前退出：已经完成选择操作，不需要后续的mouseup处理
             return;
           }
         }
@@ -1330,10 +1362,13 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
     doc.addEventListener(
       'click',
       (e) => {
-        // fix for popups close logic
+        // 🔄 修复弹窗关闭逻辑：同步iframe的click事件到主窗口
+        // 某些弹窗组件可能依赖于主窗口的事件来判断是否需要关闭
         const x = new Event('click');
-        x.initEvent('click', true);
-        this._iframe?.dispatchEvent(x);
+        x.initEvent('click', true); // 设置为冒泡事件
+        this._iframe?.dispatchEvent(x); // 将事件派发到iframe元素上
+
+        // 🎯 获取点击目标元素
         const { target } = e;
 
         const customizeIgnoreSelectors = engineConfig.get('customizeIgnoreSelectors');
@@ -2050,38 +2085,63 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
    *
    * @see IPublicModelSensor
    */
+  /**
+   * ========================================
+   * 🎯 定位拖拽目标 - 拖拽系统的核心定位算法
+   * ========================================
+   *
+   * 这是整个拖拽系统最重要的方法，负责：
+   * 1. 🔍 验证拖拽权限：检查节点是否可移动
+   * 2. 🎯 查找目标容器：确定拖拽的投放位置
+   * 3. 📐 精确位置计算：计算在容器中的具体插入位置
+   * 4. 🧭 生成位置信息：创建完整的定位数据对象
+   *
+   * @param e - 定位事件，包含鼠标位置、拖拽对象等信息
+   * @returns IPublicModelNode | null - 位置信息对象或null
+   */
   locate(e: ILocateEvent): any {
-    // 📦 1. 提取拖拽对象信息
+    // ========================================
+    // 📦 第一阶段：拖拽对象分析和权限验证
+    // ========================================
+
+    // 🎯 提取拖拽对象信息
     const { dragObject } = e; // 从定位事件中提取拖拽对象（可能是现有节点或新组件数据）
 
-    const nodes = dragObject?.nodes; // 获取被拖拽的节点数组（仅当拖拽现有节点时存在）
+    // 🔍 获取被拖拽的节点数组（仅当拖拽现有节点时存在）
+    const nodes = dragObject?.nodes; // 如果是拖拽新组件，这里为undefined
 
-    // 🔍 2. 过滤出可操作的节点（检查移动权限）
+    // 🔍 过滤出可操作的节点（检查移动权限）
     const operationalNodes = nodes?.filter((node) => {
       // 🎣 检查节点自身的移动钩子函数
-      const onMoveHook = node.componentMeta?.advanced.callbacks?.onMoveHook;
-      // 调用移动钩子函数，如果未定义则默认允许移动
-      const canMove = onMoveHook && typeof onMoveHook === 'function' ? onMoveHook(node.internalToShellNode()) : true;
+      const onMoveHook = node?.componentMeta?.advanced.callbacks?.onMoveHook;
+      // 🚦 调用移动钩子函数，如果未定义则默认允许移动
+      const canMove = onMoveHook && typeof onMoveHook === 'function' && node
+        ? onMoveHook((node as any).internalToShellNode())
+        : true;
 
       // 🔍 查找父级容器节点
       let parentContainerNode: INode | null = null;
-      let parentNode = node.parent;
+      let parentNode = node?.parent; // 从当前节点的父节点开始查找
 
-      // 向上遍历节点树，找到第一个容器节点
+      // 🔄 向上遍历节点树，找到第一个容器节点
       while (parentNode) {
         if (parentNode.isContainer()) {
           parentContainerNode = parentNode; // 找到父级容器节点
-          break;
+          break; // 停止查找
         }
         parentNode = parentNode.parent; // 继续向上查找
       }
 
       // 🎣 检查父级容器的子节点移动钩子函数
       const onChildMoveHook = parentContainerNode?.componentMeta?.advanced.callbacks?.onChildMoveHook;
-      // 调用子节点移动钩子，检查父级容器是否允许该子节点移动
-      const childrenCanMove = onChildMoveHook && parentContainerNode && typeof onChildMoveHook === 'function'
-        ? onChildMoveHook(node.internalToShellNode(), parentContainerNode.internalToShellNode())
-        : true;
+      // 🚦 调用子节点移动钩子，检查父级容器是否允许该子节点移动
+      const childrenCanMove = onChildMoveHook && parentContainerNode &&
+        typeof onChildMoveHook === 'function' && node
+        ? onChildMoveHook(
+          (node as any).internalToShellNode(),
+          (parentContainerNode as any).internalToShellNode(),
+        )
+        : true; // 默认允许
 
       // ✅ 只有同时满足节点可移动和父级允许子节点移动时，才允许操作
       return canMove && childrenCanMove;
@@ -2089,175 +2149,269 @@ export class BuiltinSimulatorHost implements ISimulatorHost<BuiltinSimulatorProp
 
     // 🚫 如果没有可操作的节点，直接返回，阻止拖拽操作
     if (nodes && (!operationalNodes || operationalNodes.length === 0)) {
-      return; // 提前退出，不进行后续的定位计算
+      return; // 🛑 提前退出，不进行后续的定位计算
     }
 
-    // 📡 3. 激活传感器和滚动处理
-    this.sensing = true; // 标记传感器处于活跃状态
-    this.scroller.scrolling(e); // 处理拖拽时的自动滚动逻辑
+    // ========================================
+    // 📡 第二阶段：系统状态更新和环境准备
+    // ========================================
 
-    // 📄 4. 获取当前文档实例
+    // 🎯 激活传感器状态
+    this.sensing = true; // 标记传感器处于活跃状态，用于响应拖拽事件
+
+    // 🖱️ 处理拖拽时的自动滚动逻辑
+    this.scroller.scrolling(e); // 当鼠标接近边缘时自动滚动
+
+    // 📄 获取当前文档实例
     const document = this.project.currentDocument; // 获取当前活跃的文档对象
     if (!document) {
-      return null; // 没有文档时无法进行定位，直接返回
+      return null; // 🚫 没有文档时无法进行定位，直接返回
     }
 
-    // 🎯 5. 核心：查找投放容器（这是判断拖入容器还是画布的关键步骤）
-    const dropContainer = this.getDropContainer(e); // 🔥 调用核心方法查找合适的投放容器
+    // ========================================
+    // 🎯 第三阶段：核心容器查找（最关键的步骤）
+    // ========================================
 
-    // 🔒 6. 检查容器是否被锁定
-    const lockedNode = getClosestNode(dropContainer?.container, (node) => node.isLocked);
-    if (lockedNode) return null; // 如果找到锁定的节点，阻止拖拽
+    // 🔥 调用核心方法查找合适的投放容器
+    const dropContainer = this.getDropContainer(e); // 这是判断拖入容器还是画布的关键步骤
 
-    // ❌ 7. 容器查找失败的处理
+    // 🔒 检查容器是否被锁定
+    const lockedNode = getClosestNode(dropContainer?.container, (node) => (node as any)?.isLocked);
+    if (lockedNode) return null; // 🛑 如果找到锁定的节点，阻止拖拽
+
+    // ❌ 容器查找失败的处理
     if (!dropContainer) {
-      return null; // 没有找到合适的容器，拖拽操作无效
+      return null; // 🚫 没有找到合适的容器，拖拽操作无效
     }
 
+    // 🎯 检查是否为特殊的位置数据对象
     if (isLocationData(dropContainer)) {
-      return this.designer.createLocation(dropContainer);
+      return this.designer.createLocation(dropContainer as any); // 直接创建位置对象
     }
 
+    // ========================================
+    // 📐 第四阶段：几何计算和位置分析
+    // ========================================
+
+    // 🔓 解构获取容器节点和React实例
     const { container, instance: containerInstance } = dropContainer;
 
+    // 📏 计算容器的边界矩形（用于后续的位置计算）
     const edge = this.computeComponentInstanceRect(
-      containerInstance,
-      container.componentMeta.rootSelector,
+      containerInstance, // React组件实例
+      container.componentMeta.rootSelector, // 根选择器
     );
 
+    // 🚫 如果无法计算容器边界，返回null
     if (!edge) {
-      return null;
+      return null; // 无法获取容器的几何信息
     }
 
+    // 👶 获取容器的子节点列表
     const { children } = container;
 
+    // 🏗️ 初始化位置详情对象
     const detail: IPublicTypeLocationChildrenDetail = {
-      type: IPublicTypeLocationDetailType.Children,
-      index: 0,
-      edge,
+      type: IPublicTypeLocationDetailType.Children, // 表示插入到子节点中
+      index: 0, // 初始插入位置为0（第一个位置）
+      edge, // 容器的边界信息
     };
 
+    // 🗂️ 构建基础位置数据对象
     const locationData = {
-      target: container,
-      detail,
-      source: `simulator${document.id}`,
-      event: e,
+      target: container, // 目标容器节点
+      detail, // 详细位置信息
+      source: `simulator${document.id}`, // 来源标识
+      event: e, // 原始事件对象
     };
 
+    // ========================================
+    // 🎭 第五阶段：特殊组件处理（模态框组件）
+    // ========================================
+
+    // 🎭 检查是否为模态框组件的特殊处理
     if (
-      e.dragObject &&
-      e.dragObject.nodes &&
-      e.dragObject.nodes.length &&
-      e.dragObject.nodes[0].componentMeta.isModal &&
-      document.focusNode
+      e.dragObject && // 确保有拖拽对象
+      e.dragObject.nodes && // 确保是节点拖拽
+      e.dragObject.nodes.length && // 确保有节点
+      e.dragObject.nodes[0].componentMeta.isModal && // 确保是模态框组件
+      document.focusNode // 确保有焦点节点
     ) {
-      return this.designer.createLocation({
-        target: document.focusNode,
-        detail,
-        source: `simulator${document.id}`,
-        event: e,
+      // 🎯 模态框组件特殊处理：放置到焦点节点而不是鼠标位置的容器
+        return this.designer.createLocation({
+        target: document.focusNode as any, // 使用焦点节点作为目标
+        detail, // 使用相同的详情对象
+        source: `simulator${document.id}`, // 来源标识
+        event: e, // 原始事件对象
       });
     }
 
+    // ========================================
+    // 🏃 第六阶段：空容器快速处理
+    // ========================================
+
+    // 🔍 如果容器没有子节点或边界信息不完整，直接返回基础位置
     if (!children || children.size < 1 || !edge) {
-      return this.designer.createLocation(locationData);
+      return this.designer.createLocation(locationData); // 🚀 快速返回，无需复杂计算
     }
 
-    let nearRect: IPublicTypeRect | null = null;
-    let nearIndex: number = 0;
-    let nearNode: INode | null = null;
-    let nearDistance: number | null = null;
-    let minTop: number | null = null;
-    let maxBottom: number | null = null;
+    // ========================================
+    // 🧮 第七阶段：精确位置计算（复杂的几何算法）
+    // ========================================
 
+    // 📊 初始化位置计算所需的变量
+    let nearRect: IPublicTypeRect | null = null; // 最近子节点的矩形区域
+    let nearIndex: number = 0; // 最近子节点的索引
+    let nearNode: INode | null = null; // 最近的子节点对象
+    let nearDistance: number | null = null; // 到最近子节点的距离
+    let minTop: number | null = null; // 所有子节点中最顶部的位置
+    let maxBottom: number | null = null; // 所有子节点中最底部的位置
+
+    // 🔄 遍历所有子节点，寻找最近的插入位置
     for (let i = 0, l = children.size; i < l; i++) {
-      const node = children.get(i)!;
-      const index = i;
+      // 🎯 获取当前子节点和其索引
+      const node = children.get(i)!; // 获取第i个子节点
+      const index = i; // 记录当前索引
+
+      // 🔍 获取子节点的React组件实例
       const instances = this.getComponentInstances(node);
+
+      // 🎯 选择合适的组件实例
       const inst = instances
         ? instances.length > 1
           ? instances.find(
-            (_inst) => this.getClosestNodeInstance(_inst, container.id)?.instance === containerInstance,
+            (_inst) => this.getClosestNodeInstance(
+              _inst,
+              container.id,
+            )?.instance === containerInstance,
           )
           : instances[0]
         : null;
+
+      // 📏 计算子节点的矩形边界
       const rect = inst
-        ? this.computeComponentInstanceRect(inst, node.componentMeta.rootSelector)
+        ? this.computeComponentInstanceRect(
+          inst,
+          node.componentMeta.rootSelector,
+        )
         : null;
 
+      // 🚫 如果无法获取矩形信息，跳过该子节点
       if (!rect) {
-        continue;
+        continue; // 跳到下一个子节点
       }
 
-      const distance = isPointInRect(e as any, rect) ? 0 : distanceToRect(e as any, rect);
+      // 📐 计算鼠标位置到子节点的距离
+      const distance = isPointInRect(e as any, rect)
+        ? 0
+        : distanceToRect(e as any, rect);
 
+      // 🎯 如果鼠标正好在子节点内部（距离为0）
       if (distance === 0) {
-        nearDistance = distance;
-        nearNode = node;
-        nearIndex = index;
-        nearRect = rect;
-        break;
+        nearDistance = distance; // 设置最近距离为0
+        nearNode = node; // 设置最近节点
+        nearIndex = index; // 设置最近索引
+        nearRect = rect; // 设置最近矩形
+        break; // 🛑 找到精确匹配，停止搜索
       }
 
-      // 标记子节点最顶
+      // 📊 记录子节点的最顶部位置
       if (minTop === null || rect.top < minTop) {
-        minTop = rect.top;
-      }
-      // 标记子节点最底
-      if (maxBottom === null || rect.bottom > maxBottom) {
-        maxBottom = rect.bottom;
+        minTop = rect.top; // 更新最顶部位置
       }
 
+      // 📊 记录子节点的最底部位置
+      if (maxBottom === null || rect.bottom > maxBottom) {
+        maxBottom = rect.bottom; // 更新最底部位置
+      }
+
+      // 🔍 更新最近的子节点信息（距离比较）
       if (nearDistance === null || distance < nearDistance) {
-        nearDistance = distance;
-        nearNode = node;
-        nearIndex = index;
-        nearRect = rect;
+        nearDistance = distance; // 更新最近距离
+        nearNode = node; // 更新最近节点
+        nearIndex = index; // 更新最近索引
+        nearRect = rect; // 更新最近矩形
       }
     }
 
+    // 🎯 设置基础插入索引
     detail.index = nearIndex;
 
+    // ========================================
+    // 🧭 第八阶段：精确插入位置和方向计算
+    // ========================================
+
+    // 🎯 如果找到了最近的子节点，进行精确位置计算
     if (nearNode && nearRect) {
+      // 🔍 获取矩形对应的DOM元素
       const el = getRectTarget(nearRect);
+
+      // 📐 判断是否为内联元素
       const inline = el ? isChildInline(el) : false;
+
+      // 📐 判断是否为行容器
       const row = el ? isRowContainer(el.parentElement!) : false;
+
+      // 📐 确定布局方向：内联或行容器为垂直布局
       const vertical = inline || row;
 
-      // TODO: fix type
+      // 🧭 构建近邻位置信息对象
       const near: {
         node: IPublicModelNode;
         pos: 'before' | 'after' | 'replace';
         rect?: IPublicTypeRect;
         align?: 'V' | 'H';
       } = {
-        node: nearNode.internalToShellNode()!,
-        pos: 'before',
-        align: vertical ? 'V' : 'H',
+        node: (nearNode as any).internalToShellNode()!, // 转换为Shell节点对象
+        pos: 'before', // 默认插入到前面
+        align: vertical ? 'V' : 'H', // 设置对齐方向：V垂直，H水平
       };
+
+      // 🔗 将近邻信息附加到详情对象
       detail.near = near;
+
+      // 🎯 判断是否应该插入到后面
       if (isNearAfter(e as any, nearRect, vertical)) {
-        near.pos = 'after';
-        detail.index = nearIndex + 1;
+        near.pos = 'after'; // 设置为插入到后面
+        detail.index = nearIndex + 1; // 索引加1
       }
+
+      // 🏃 非行容器且不在节点内部时的边缘判断
       if (!row && nearDistance !== 0) {
+        // 📐 计算到容器边缘的距离
         const edgeDistance = distanceToEdge(e as any, edge);
+
+        // 🎯 如果到边缘的距离更近，插入到容器边缘
         if (edgeDistance.distance < nearDistance!) {
-          const { nearAfter } = edgeDistance;
+          const { nearAfter } = edgeDistance; // 获取是否在后边缘
+
+          // 📊 确保边界值有效
           if (minTop == null) {
-            minTop = edge.top;
+            minTop = edge.top; // 使用容器顶部
           }
           if (maxBottom == null) {
-            maxBottom = edge.bottom;
+            maxBottom = edge.bottom; // 使用容器底部
           }
-          near.rect = new DOMRect(edge.left, minTop, edge.width, maxBottom - minTop);
-          near.align = 'H';
+
+          // 🏗️ 创建完整的容器矩形
+          near.rect = new DOMRect(
+            edge.left,
+            minTop,
+            edge.width,
+            maxBottom - minTop,
+          );
+          near.align = 'H'; // 设置为水平对齐
           near.pos = nearAfter ? 'after' : 'before';
           detail.index = nearAfter ? children.size : 0;
         }
       }
     }
 
+    // ========================================
+    // 🎊 第九阶段：创建最终位置对象
+    // ========================================
+
+    // 🏁 创建并返回完整的位置对象
     return this.designer.createLocation(locationData);
   }
 
