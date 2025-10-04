@@ -1,0 +1,854 @@
+{
+    "version": "1.0.0",
+    "componentsMap": [
+      {
+        "package": "taitan-components-pc",
+        "version": "0.0.44",
+        "main": "src/index.tsx",
+        "exportName": "IndicatorCard",
+        "destructuring": true,
+        "subName": "",
+        "componentName": "IndicatorCard"
+      },
+      {
+        "package": "taitan-components-pc",
+        "version": "0.0.44",
+        "main": "src/index.tsx",
+        "exportName": "SingleIndicatorCard",
+        "destructuring": true,
+        "subName": "",
+        "componentName": "SingleIndicatorCard"
+      },
+      {
+        "package": "taitan-components-pc",
+        "version": "0.0.44",
+        "main": "src/index.tsx",
+        "exportName": "PieChart",
+        "destructuring": true,
+        "subName": "",
+        "componentName": "PieChart"
+      },
+      {
+        "package": "taitan-components-pc",
+        "version": "0.0.44",
+        "main": "src/index.tsx",
+        "exportName": "Text",
+        "destructuring": true,
+        "subName": "",
+        "componentName": "Text"
+      },
+      {
+        "package": "taitan-components-pc",
+        "version": "0.0.44",
+        "main": "src/index.tsx",
+        "exportName": "Table",
+        "destructuring": true,
+        "subName": "",
+        "componentName": "Table"
+      },
+      {
+        "package": "taitan-components-pc",
+        "version": "0.0.44",
+        "exportName": "GlobalFilter",
+        "destructuring": true,
+        "subName": "",
+        "componentName": "GlobalFilter"
+      },
+      {
+        "package": "taitan-components-pc",
+        "version": "0.0.44",
+        "exportName": "RootContentNew",
+        "destructuring": true,
+        "subName": "",
+        "componentName": "RootContentNew"
+      },
+      {
+        "devMode": "lowCode",
+        "componentName": "Page"
+      }
+    ],
+    "componentsTree": [
+      {
+        "componentName": "Page",
+        "id": "node_dockcviv8fo1",
+        "props": {
+          "ref": "outerView",
+          "style": {
+            "height": "100%",
+            "backgroundColor": "#f2f3f5",
+            "width": "100%"
+          },
+          "clientType": "pc"
+        },
+        "fileName": "/",
+        "state": {
+          "text": {
+            "type": "JSExpression",
+            "value": "\"outer\""
+          },
+          "isShowDialog": {
+            "type": "JSExpression",
+            "value": "false"
+          }
+        },
+        "lifeCycles": {},
+        "methods": {
+          "testFunc": {
+            "type": "JSFunction",
+            "value": "function testFunc() {\n  console.log('test aliLowcode func');\n  return /*#__PURE__*/React.createElement(\"div\", {\n    className: \"test-aliLowcode-func\"\n  }, this.state.test);\n}",
+            "source": "function testFunc() {\n  console.log('test aliLowcode func');\n  return <div className=\"test-aliLowcode-func\">\n        {this.state.test}\n      </div>;\n}"
+          }
+        },
+        "hidden": false,
+        "title": "容器组件",
+        "isLocked": false,
+        "condition": true,
+        "conditionGroup": "",
+        "originCode": "class Page extends Component {\n  state = {\n    \"text\": \"outer\",\n    \"isShowDialog\": false,\n  }\n  \n  \n  // 你可以在这里编写函数，并且与组件的事件进行绑定，支持JSX语法\n  testFunc() {\n    console.log('test aliLowcode func');\n    return (\n      <div className=\"test-aliLowcode-func\">\n        {this.state.test}\n      </div>\n    );\n  }\n  \n}",
+        "css": "",
+        "children": [
+          {
+            "componentName": "RootContentNew",
+            "id": "node_ocllzw8twf1",
+            "props": {
+              "layout": [
+                {
+                  "w": 20,
+                  "h": 22,
+                  "x": 0,
+                  "y": 48,
+                  "i": ".$node_ocmfazridm2",
+                  "minH": 5,
+                  "moved": false,
+                  "static": false
+                },
+                {
+                  "w": 4,
+                  "h": 14,
+                  "x": 12,
+                  "y": 70,
+                  "i": ".$node_ocmfuugfmu4",
+                  "minH": 5,
+                  "moved": false,
+                  "static": false
+                },
+                {
+                  "w": 4,
+                  "h": 14,
+                  "x": 0,
+                  "y": 70,
+                  "i": ".$node_ocmfuugfmu1",
+                  "minH": 5,
+                  "moved": false,
+                  "static": false
+                },
+                {
+                  "w": 4,
+                  "h": 14,
+                  "x": 4,
+                  "y": 70,
+                  "i": ".$node_ocmfuugfmu2",
+                  "minH": 5,
+                  "moved": false,
+                  "static": false
+                },
+                {
+                  "w": 4,
+                  "h": 14,
+                  "x": 16,
+                  "y": 70,
+                  "i": ".$node_ocmfuugfmu5",
+                  "minH": 5,
+                  "moved": false,
+                  "static": false
+                },
+                {
+                  "w": 4,
+                  "h": 14,
+                  "x": 8,
+                  "y": 70,
+                  "i": ".$node_ocmfuugfmu3",
+                  "minH": 5,
+                  "moved": false,
+                  "static": false
+                },
+                {
+                  "w": 20,
+                  "h": 43,
+                  "x": 0,
+                  "y": 84,
+                  "i": ".$node_ocmfuugesa1",
+                  "minH": 5,
+                  "moved": false,
+                  "static": false
+                },
+                {
+                  "w": 10,
+                  "h": 41,
+                  "x": 10,
+                  "y": 7,
+                  "i": ".$node_ocmfayrm9g1",
+                  "minH": 5,
+                  "moved": false,
+                  "static": false
+                },
+                {
+                  "w": 10,
+                  "h": 41,
+                  "x": 0,
+                  "y": 7,
+                  "i": ".$node_ocmfazridm1",
+                  "minH": 5,
+                  "moved": false,
+                  "static": false
+                },
+                {
+                  "w": 20,
+                  "h": 44,
+                  "x": 0,
+                  "y": 139,
+                  "i": ".$node_ocmfbwa5581",
+                  "minH": 5,
+                  "moved": false,
+                  "static": false
+                },
+                {
+                  "w": 20,
+                  "h": 12,
+                  "x": 0,
+                  "y": 127,
+                  "i": ".$node_ocmfbwa5ka1",
+                  "minH": 5,
+                  "moved": false,
+                  "static": false
+                },
+                {
+                  "w": 20,
+                  "h": 53,
+                  "x": 0,
+                  "y": 192,
+                  "i": ".$node_ocmfeq0trm1",
+                  "minH": 5,
+                  "moved": false,
+                  "static": false
+                },
+                {
+                  "w": 20,
+                  "h": 9,
+                  "x": 0,
+                  "y": 183,
+                  "i": ".$node_ocmfeq0trm2",
+                  "minH": 5,
+                  "moved": false,
+                  "static": false
+                },
+                {
+                  "w": 20,
+                  "h": 7,
+                  "x": 0,
+                  "y": 0,
+                  "i": ".$node_ocmfayrmw71",
+                  "minH": 5,
+                  "moved": false,
+                  "static": false
+                }
+              ],
+              "style": {
+                "width": "100%"
+              },
+              "clientType": "pc",
+              "layoutMode": "magnetic",
+              "isRefresh": false,
+              "refreshTime": 10,
+              "configIsOpenLinkData": false,
+              "otherConfig": {
+                "componentMarginType": "custom",
+                "componentMargin": 10
+              }
+            },
+            "hidden": false,
+            "title": "",
+            "isLocked": false,
+            "condition": true,
+            "conditionGroup": "",
+            "children": [
+              {
+                "componentName": "IndicatorCard",
+                "id": "node_ocmfazridm2",
+                "props": {
+                  "themeType": "default",
+                  "indicatorCardConfig": {
+                    "alignMethod": "left",
+                    "isSelfAdaption": false,
+                    "maxColumns": 4,
+                    "bordered": true,
+                    "isShowDimensionName": true,
+                    "dimensionNameFontSize": 14,
+                    "dimensionNameColor": "#333",
+                    "isShowIndicatorName": true,
+                    "indicatorNameFontSize": 12,
+                    "indicatorNameColor": "#333",
+                    "indicatorValueFontSize": 24,
+                    "indicatorValueColor": "#333",
+                    "indicatorValueUnitFontSize": 12,
+                    "indicatorValueUnitColor": "#333",
+                    "indicatorValueFontWeight": 500,
+                    "backgroundItemColor": "",
+                    "backgroundItemImage": "",
+                    "isValueScroll": false
+                  },
+                  "settings": {
+                    "unitId": "unit_885235810326712321",
+                    "componentType": "card",
+                    "componentName": "核心指标",
+                    "isShowComponentName": true,
+                    "isShowUpdateTime": true,
+                    "viewDetail": "",
+                    "filterConfigList": [],
+                    "showPagination": true,
+                    "pageSize": 5,
+                    "isHeightAutoFit": 0,
+                    "isTotal": 1,
+                    "isOpen": 1
+                  },
+                  "clientType": "pc",
+                  "componentOtherConfig": {
+                    "componentPaddingType": "wide",
+                    "titleBottomMargin": 14,
+                    "componentPadding": {
+                      "paddingTop": "20px",
+                      "paddingRight": "20px",
+                      "paddingBottom": "20px",
+                      "paddingLeft": "20px"
+                    }
+                  }
+                },
+                "hidden": false,
+                "title": "",
+                "isLocked": false,
+                "condition": true,
+                "conditionGroup": ""
+              },
+              {
+                "componentName": "SingleIndicatorCard",
+                "id": "node_ocmfuugfmu4",
+                "props": {
+                  "themeType": "default",
+                  "selfConfig": {
+                    "styleType": "large"
+                  },
+                  "settings": {
+                    "unitId": "unit_3561187630137257984",
+                    "componentType": "u_single_card",
+                    "componentName": "dws下游依赖大于等于3的占比",
+                    "isShowComponentName": false,
+                    "isShowUpdateTime": true,
+                    "viewDetail": "",
+                    "filterConfigList": [],
+                    "showPagination": true,
+                    "pageSize": 5,
+                    "isHeightAutoFit": 0,
+                    "isTotal": 1,
+                    "isOpen": 1
+                  }
+                },
+                "hidden": false,
+                "title": "",
+                "isLocked": false,
+                "condition": true,
+                "conditionGroup": ""
+              },
+              {
+                "componentName": "SingleIndicatorCard",
+                "id": "node_ocmfuugfmu1",
+                "props": {
+                  "themeType": "default",
+                  "selfConfig": {
+                    "styleType": "large"
+                  },
+                  "settings": {
+                    "unitId": "unit_3561109173794504704",
+                    "componentType": "u_single_card",
+                    "componentName": "表使用率",
+                    "isShowComponentName": false,
+                    "isShowUpdateTime": true,
+                    "viewDetail": "",
+                    "filterConfigList": [],
+                    "showPagination": true,
+                    "pageSize": 5,
+                    "isHeightAutoFit": 0,
+                    "isTotal": 1,
+                    "isOpen": 1
+                  },
+                  "componentOtherConfig": {
+                    "componentPaddingType": "wide",
+                    "titleBottomMargin": 14,
+                    "componentPadding": {
+                      "paddingTop": "20px",
+                      "paddingRight": "20px",
+                      "paddingBottom": "20px",
+                      "paddingLeft": "20px"
+                    }
+                  }
+                },
+                "hidden": false,
+                "title": "",
+                "isLocked": false,
+                "condition": true,
+                "conditionGroup": ""
+              },
+              {
+                "componentName": "SingleIndicatorCard",
+                "id": "node_ocmfuugfmu2",
+                "props": {
+                  "themeType": "default",
+                  "selfConfig": {
+                    "styleType": "large"
+                  },
+                  "settings": {
+                    "unitId": "unit_3561123884668702720",
+                    "componentType": "u_single_card",
+                    "componentName": "ODS下游依赖占比",
+                    "isShowComponentName": false,
+                    "isShowUpdateTime": true,
+                    "viewDetail": "",
+                    "filterConfigList": [],
+                    "showPagination": true,
+                    "pageSize": 5,
+                    "isHeightAutoFit": 0,
+                    "isTotal": 1,
+                    "isOpen": 1
+                  }
+                },
+                "hidden": false,
+                "title": "",
+                "isLocked": false,
+                "condition": true,
+                "conditionGroup": ""
+              },
+              {
+                "componentName": "SingleIndicatorCard",
+                "id": "node_ocmfuugfmu5",
+                "props": {
+                  "themeType": "default",
+                  "selfConfig": {
+                    "styleType": "large"
+                  },
+                  "settings": {
+                    "unitId": "unit_3561193657637613569",
+                    "componentType": "u_single_card",
+                    "componentName": "app引用app占比",
+                    "isShowComponentName": false,
+                    "isShowUpdateTime": true,
+                    "viewDetail": "",
+                    "filterConfigList": [],
+                    "showPagination": true,
+                    "pageSize": 5,
+                    "isHeightAutoFit": 0,
+                    "isTotal": 1,
+                    "isOpen": 1
+                  }
+                },
+                "hidden": false,
+                "title": "",
+                "isLocked": false,
+                "condition": true,
+                "conditionGroup": ""
+              },
+              {
+                "componentName": "SingleIndicatorCard",
+                "id": "node_ocmfuugfmu3",
+                "props": {
+                  "themeType": "default",
+                  "selfConfig": {
+                    "styleType": "large"
+                  },
+                  "settings": {
+                    "unitId": "unit_3561182732021661696",
+                    "componentType": "u_single_card",
+                    "componentName": "dwd下游依赖大于等于3的占比",
+                    "isShowComponentName": false,
+                    "isShowUpdateTime": true,
+                    "viewDetail": "",
+                    "filterConfigList": [],
+                    "showPagination": true,
+                    "pageSize": 5,
+                    "isHeightAutoFit": 0,
+                    "isTotal": 1,
+                    "isOpen": 1
+                  }
+                },
+                "hidden": false,
+                "title": "",
+                "isLocked": false,
+                "condition": true,
+                "conditionGroup": ""
+              },
+              {
+                "componentName": "PieChart",
+                "id": "node_ocmfuugesa1",
+                "props": {
+                  "themeType": "default",
+                  "legendConfig": {
+                    "show": true,
+                    "position": "top",
+                    "fontSizeDimension": 13,
+                    "fontColorDimension": "#999",
+                    "fontWeightDimension": 400,
+                    "showValue": true,
+                    "fontSize": 20,
+                    "fontColor": "#333",
+                    "fontWeight": 400
+                  },
+                  "pieChartConfig": {
+                    "percentPrecision": 2,
+                    "title": {
+                      "show": false,
+                      "text": "总计",
+                      "fontColor": "#FFF",
+                      "textSize": 14,
+                      "fontSize": 20,
+                      "fontWeight": 700
+                    }
+                  },
+                  "labelConfig": {
+                    "show": true,
+                    "position": "outside",
+                    "showContent": [
+                      "name",
+                      "percent"
+                    ],
+                    "nameColor": "default",
+                    "valueColor": "default",
+                    "firstColor": "#333",
+                    "secondColor": "#999",
+                    "labelDisplayType": "all",
+                    "labelDisplayCount": 5
+                  },
+                  "tooltipConfig": {
+                    "show": true
+                  },
+                  "settings": {
+                    "unitId": "unit_3561075437363265536",
+                    "componentType": "u_pie",
+                    "componentName": "各域使用表层级分布明细",
+                    "isShowComponentName": true,
+                    "isShowUpdateTime": true,
+                    "viewDetail": "",
+                    "filterConfigList": [],
+                    "showPagination": true,
+                    "pageSize": 5,
+                    "isHeightAutoFit": 0,
+                    "isTotal": 1,
+                    "isOpen": 1
+                  },
+                  "componentOtherConfig": {
+                    "componentPaddingType": "wide",
+                    "titleBottomMargin": 14,
+                    "componentPadding": {
+                      "paddingTop": "20px",
+                      "paddingRight": "20px",
+                      "paddingBottom": "20px",
+                      "paddingLeft": "20px"
+                    }
+                  }
+                },
+                "hidden": false,
+                "title": "",
+                "isLocked": false,
+                "condition": true,
+                "conditionGroup": ""
+              },
+              {
+                "componentName": "PieChart",
+                "id": "node_ocmfayrm9g1",
+                "props": {
+                  "themeType": "default",
+                  "legendConfig": {
+                    "show": false,
+                    "position": "top",
+                    "fontSizeDimension": 13,
+                    "fontColorDimension": "#999",
+                    "fontWeightDimension": 400,
+                    "showValue": false,
+                    "fontSize": 20,
+                    "fontColor": "#333",
+                    "fontWeight": 400
+                  },
+                  "pieChartConfig": {
+                    "percentPrecision": 2,
+                    "title": {
+                      "show": true,
+                      "text": "健康分",
+                      "fontColor": "#FFF",
+                      "textSize": 14,
+                      "fontSize": 20,
+                      "fontWeight": 700
+                    }
+                  },
+                  "labelConfig": {
+                    "show": true,
+                    "position": "outside",
+                    "showContent": [
+                      "name",
+                      "value"
+                    ],
+                    "firstColor": "#333",
+                    "secondColor": "#999",
+                    "nameColor": "default",
+                    "valueColor": "default"
+                  },
+                  "tooltipConfig": {
+                    "show": true
+                  },
+                  "settings": {
+                    "unitId": "unit_885229360272764929",
+                    "componentType": "u_pie",
+                    "componentName": "数仓项目健康度",
+                    "isShowComponentName": true,
+                    "isShowUpdateTime": true,
+                    "viewDetail": "",
+                    "filterConfigList": [],
+                    "showPagination": true,
+                    "pageSize": 5,
+                    "isHeightAutoFit": 0,
+                    "isTotal": 1,
+                    "isOpen": 1
+                  },
+                  "componentOtherConfig": {
+                    "componentPaddingType": "wide",
+                    "titleBottomMargin": 14,
+                    "componentPadding": {
+                      "paddingTop": "20px",
+                      "paddingRight": "20px",
+                      "paddingBottom": "20px",
+                      "paddingLeft": "20px"
+                    }
+                  },
+                  "clientType": "pc"
+                },
+                "hidden": false,
+                "title": "",
+                "isLocked": false,
+                "condition": true,
+                "conditionGroup": ""
+              },
+              {
+                "componentName": "Text",
+                "id": "node_ocmfazridm1",
+                "props": {
+                  "themeType": "default",
+                  "settings": {
+                    "unitId": "unit_885235098451062785",
+                    "componentType": "u_text",
+                    "componentName": "文本框",
+                    "isShowComponentName": false,
+                    "isShowUpdateTime": false,
+                    "viewDetail": "",
+                    "filterConfigList": [],
+                    "showPagination": true,
+                    "pageSize": 5,
+                    "isHeightAutoFit": 0,
+                    "isTotal": 1,
+                    "isOpen": 1,
+                    "richTextFormat": {
+                      "textBoxConfig": {
+                        "textContent": "<p><span style=\"font-size: 16px;\"><strong>数仓规范文档：</strong></span><span style=\"font-size: 16px;\"><u><strong> </strong></u></span><a href=\"https://gaotuedu.feishu.cn/wiki/VShpwmbyliLNOVk2JR0cPj5Knrc?fromScene=spaceOverview&open_in_browser=true\" target=\"_blank\"><span style=\"font-size: 16px;\"><u>https://gaotuedu.feishu.cn/wiki/VShpwmbyliLNOVk2JR0cPj5Knrc?fromScene=spaceOverview&amp;open_in_browser=true</u></span></a><span style=\"font-size: 16px;\"><u> </u></span></p><p><span style=\"font-size: 14px;\"><strong> &nbsp; &nbsp;规范分：满分100；以数仓规范文档中定义的</strong></span><span style=\"color: rgb(225, 60, 57); font-size: 14px;\"><u><strong>规范</strong></u></span><span style=\"font-size: 14px;\"><strong>类指标为基准，每个不合规率指标的值，即为扣分值。如：表层级不合规率为2%，则规范分为 100 -2 = 98分</strong></span></p><p><span style=\"font-size: 14px;\"><strong> &nbsp; &nbsp;质量分：满分100；以数仓规范文档中定义的</strong></span><span style=\"color: rgb(225, 60, 57); font-size: 14px;\"><u><strong>质量</strong></u></span><span style=\"font-size: 14px;\"><strong>类指标为基准，每个不合规率指标的值，即为扣分值。如：非公共层属性引用异常率为1.85%，则规范分为 100 -1.85 = 98.15分</strong></span></p><p><span style=\"font-size: 14px;\"><strong> &nbsp; &nbsp;成本分：待补充</strong></span></p><p><span style=\"font-size: 14px;\"><strong> &nbsp; &nbsp;计算分：待补充</strong></span></p><p><span style=\"font-size: 14px;\"><strong> &nbsp; &nbsp;安全分：待补充</strong></span></p><p><span style=\"font-size: 14px;\"><strong> &nbsp; &nbsp;价值分：待补充</strong></span></p><p><br></p>",
+                        "useParamList": [],
+                        "allParamList": [],
+                        "closeGroupConcat": 0,
+                        "tempTextContent": "<p>// TODO</p>"
+                      }
+                    }
+                  },
+                  "clientType": "pc",
+                  "componentOtherConfig": {
+                    "componentPaddingType": "wide",
+                    "titleBottomMargin": 14,
+                    "componentPadding": {
+                      "paddingTop": "20px",
+                      "paddingRight": "20px",
+                      "paddingBottom": "20px",
+                      "paddingLeft": "20px"
+                    }
+                  }
+                },
+                "hidden": false,
+                "title": "",
+                "isLocked": false,
+                "condition": true,
+                "conditionGroup": ""
+              },
+              {
+                "componentName": "Table",
+                "id": "node_ocmfbwa5581",
+                "props": {
+                  "themeType": "default",
+                  "settings": {
+                    "unitId": "unit_885462956749463553",
+                    "componentType": "u_table",
+                    "componentName": "表明细信息",
+                    "isShowComponentName": true,
+                    "isShowUpdateTime": true,
+                    "viewDetail": "",
+                    "filterConfigList": [],
+                    "showPagination": true,
+                    "pageSize": 5,
+                    "showDownloadBtn": true,
+                    "isHeightAutoFit": 0,
+                    "isTotal": 1,
+                    "isOpen": 1
+                  },
+                  "componentOtherConfig": {
+                    "componentPaddingType": "wide",
+                    "titleBottomMargin": 14,
+                    "componentPadding": {
+                      "paddingTop": "20px",
+                      "paddingRight": "20px",
+                      "paddingBottom": "20px",
+                      "paddingLeft": "20px"
+                    }
+                  },
+                  "tableShowConfig": {
+                    "isTableColumnAutoFit": false,
+                    "maxColumnWidth": 220,
+                    "headerAlign": "center",
+                    "rankListDimensionFontSize": 16,
+                    "rankListIndicatorFontSize": 16,
+                    "headFontSize": 16,
+                    "bodyFontSize": 16,
+                    "bodyLineHeight": 44,
+                    "animationType": "animate__slideInUp"
+                  },
+                  "clientType": "pc"
+                },
+                "hidden": false,
+                "title": "",
+                "isLocked": false,
+                "condition": true,
+                "conditionGroup": ""
+              },
+              {
+                "componentName": "GlobalFilter",
+                "id": "node_ocmfbwa5ka1",
+                "props": {
+                  "themeType": "default",
+                  "backgroundColor": "#FFF",
+                  "settings": {
+                    "showSearchBtn": false,
+                    "affixed": false,
+                    "unitId": "public_filter_relation_885464712799690752",
+                    "componentType": "public_filter_relation",
+                    "componentName": "全局筛选器"
+                  },
+                  "componentOtherConfig": {
+                    "componentPaddingType": "wide",
+                    "componentPadding": {
+                      "paddingTop": "8px",
+                      "paddingRight": "8px",
+                      "paddingBottom": "8px",
+                      "paddingLeft": "8px"
+                    }
+                  },
+                  "clientType": "pc"
+                },
+                "hidden": false,
+                "title": "",
+                "isLocked": false,
+                "condition": true,
+                "conditionGroup": ""
+              },
+              {
+                "componentName": "Table",
+                "id": "node_ocmfeq0trm1",
+                "props": {
+                  "themeType": "default",
+                  "settings": {
+                    "unitId": "unit_886180109007818753",
+                    "componentType": "u_table",
+                    "componentName": "任务下游依赖数量",
+                    "isShowComponentName": true,
+                    "isShowUpdateTime": true,
+                    "viewDetail": "",
+                    "filterConfigList": [],
+                    "showPagination": true,
+                    "pageSize": 10,
+                    "isHeightAutoFit": 0,
+                    "isTotal": 1,
+                    "isOpen": 1
+                  },
+                  "clientType": "pc"
+                },
+                "hidden": false,
+                "title": "",
+                "isLocked": false,
+                "condition": true,
+                "conditionGroup": ""
+              },
+              {
+                "componentName": "GlobalFilter",
+                "id": "node_ocmfeq0trm2",
+                "props": {
+                  "themeType": "default",
+                  "backgroundColor": "#FFF",
+                  "settings": {
+                    "showSearchBtn": false,
+                    "affixed": false,
+                    "unitId": "public_filter_relation_886181171298447361",
+                    "componentType": "public_filter_relation",
+                    "componentName": "全局筛选器"
+                  },
+                  "clientType": "pc"
+                },
+                "hidden": false,
+                "title": "",
+                "isLocked": false,
+                "condition": true,
+                "conditionGroup": ""
+              },
+              {
+                "componentName": "GlobalFilter",
+                "id": "node_ocmfayrmw71",
+                "props": {
+                  "themeType": "default",
+                  "backgroundColor": "#FFF",
+                  "settings": {
+                    "showSearchBtn": false,
+                    "affixed": false,
+                    "unitId": "public_filter_relation_885231705611612161",
+                    "componentType": "public_filter_relation",
+                    "componentName": "全局筛选器"
+                  },
+                  "clientType": "pc",
+                  "componentOtherConfig": {
+                    "componentPaddingType": "wide",
+                    "componentPadding": {
+                      "paddingTop": "8px",
+                      "paddingRight": "8px",
+                      "paddingBottom": "8px",
+                      "paddingLeft": "8px"
+                    }
+                  }
+                },
+                "hidden": false,
+                "title": "",
+                "isLocked": false,
+                "condition": true,
+                "conditionGroup": ""
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "i18n": {},
+    "utils": [],
+    "constants": {},
+    "meta": {},
+    "config": {
+      "themeType": "default",
+      "styleId": "theme_711584027590430721",
+      "clientType": "pc"
+    },
+    "css": ""
+  }

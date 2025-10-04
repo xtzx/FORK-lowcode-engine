@@ -1,3 +1,34 @@
+/**
+ * ========================================
+ * 🍃 LeafWrapper - 设计态响应式更新包装器
+ * ========================================
+ *
+ * 🎯 核心职责：
+ * 在设计态（designMode === 'design'）下，为每个组件包装一个 HOC（高阶组件）
+ * 实现组件的响应式更新，当 Schema 变化时，自动触发对应组件的重渲染
+ *
+ * 🔥 主要功能：
+ * 1. **监听 Schema 变化**：props、children、visible、condition 等
+ * 2. **最小渲染单元优化**：只重渲染变化的组件，不重渲染整个页面
+ * 3. **性能优化**：使用 debounce 防抖、缓存机制
+ * 4. **设计器集成**：提供 _leaf 属性，连接设计器的 Node 对象
+ *
+ * 🔄 工作流程：
+ * 1. 用户在设计器中修改组件属性
+ * 2. 设计器触发 Node.onPropChange 事件
+ * 3. LeafWrapper 监听到事件，调用 setState 更新 nodeProps
+ * 4. React 重渲染该组件（不影响其他组件）
+ *
+ * ⚠️ 注意：
+ * - **只在设计态使用**：运行态（生产环境）不会应用此 HOC，直接渲染原组件
+ * - **性能关键**：实现了最小渲染单元，避免全页面重渲染
+ *
+ * 📦 使用场景：
+ * - 低代码编辑器的画布区域
+ * - 实时预览功能
+ * - Schema 可视化编辑
+ */
+
 import { INode, IPublicTypePropChangeOptions } from '@alilc/lowcode-designer';
 import { GlobalEvent, IPublicEnumTransformStage, IPublicTypeNodeSchema, IPublicTypeEngineOptions } from '@alilc/lowcode-types';
 import { isReactComponent, cloneEnumerableProperty } from '@alilc/lowcode-utils';
@@ -6,82 +37,149 @@ import adapter from '../adapter';
 import * as types from '../types/index';
 import logger from '../utils/logger';
 
+/**
+ * 组件 HOC 信息
+ * 传递给 leafWrapper 的参数
+ */
 export interface IComponentHocInfo {
-  schema: any;
-  baseRenderer: types.IBaseRendererInstance;
-  componentInfo: any;
-  scope: any;
+  schema: any;                                // Schema 对象
+  baseRenderer: types.IBaseRendererInstance;  // 渲染器实例（PageRenderer/ComponentRenderer等）
+  componentInfo: any;                         // 组件元信息（来自 setter 配置）
+  scope: any;                                 // 作用域对象（包含 props、state、this 等）
 }
 
+/**
+ * 组件 HOC 的 Props
+ */
 export interface IComponentHocProps {
-  __tag: any;
-  componentId: any;
-  _leaf: any;
-  forwardedRef?: any;
+  __tag: any;         // 随机标识（设计态每次渲染都会变化，用于强制更新）
+  componentId: any;   // 组件 ID（对应 schema.id）
+  _leaf: any;         // 🔥 设计器 Node 对象（连接设计器和渲染器的桥梁）
+  forwardedRef?: any; // 转发的 ref
 }
 
+/**
+ * 组件 HOC 的 State
+ */
 export interface IComponentHocState {
-  childrenInState: boolean;
-  nodeChildren: any;
-  nodeCacheProps: any;
+  childrenInState: boolean; // children 是否存储在 state 中
+  nodeChildren: any;        // 子节点（从 _leaf 解析出来）
+  nodeCacheProps: any;      // 缓存的 props（用于对比是否变化）
 
-  /** 控制是否显示隐藏 */
+  /** 控制是否显示隐藏（对应 schema.hidden）*/
   visible: boolean;
 
-  /** 控制是否渲染 */
+  /** 控制是否渲染（对应 schema.condition）*/
   condition: boolean;
-  nodeProps: any;
+
+  nodeProps: any;  // 组件 props（从 schema.props 解析出来）
 }
 
+// 设计模式类型（从 EngineOptions 提取）
 type DesignMode = Pick<IPublicTypeEngineOptions, 'designMode'>['designMode'];
 
+/**
+ * 组件 HOC 配置
+ */
 export interface IComponentHoc {
-  designMode: DesignMode | DesignMode[];
-  hoc: IComponentConstruct;
+  designMode: DesignMode | DesignMode[];  // 应用此 HOC 的设计模式列表
+  hoc: IComponentConstruct;               // HOC 构造函数
 }
 
+/**
+ * HOC 构造函数类型
+ * 接收原组件和信息，返回包装后的组件类
+ */
 export type IComponentConstruct = (Comp: types.IBaseRenderComponent, info: IComponentHocInfo) => types.IGeneralConstructor;
 
+/**
+ * LeafHoc 组件的 Props
+ */
 interface IProps {
-  _leaf: INode | undefined;
+  _leaf: INode | undefined;  // 🔥 设计器 Node 对象（最重要的 prop）
 
-  visible: boolean;
+  visible: boolean;          // 是否可见
 
-  componentId: number;
+  componentId: number;       // 组件 ID
 
-  children?: INode[];
+  children?: INode[];        // 子节点列表
 
-  __tag: number;
+  __tag: number;             // 随机标识（用于强制更新）
 
-  forwardedRef?: any;
+  forwardedRef?: any;        // 转发的 ref
 }
 
+/**
+ * 重渲染类型枚举
+ * 用于性能分析和调试
+ */
 enum RerenderType {
-  All = 'All',
-  ChildChanged = 'ChildChanged',
-  PropsChanged = 'PropsChanged',
-  VisibleChanged = 'VisibleChanged',
-  MinimalRenderUnit = 'MinimalRenderUnit',
+  All = 'All',                         // 全量渲染
+  ChildChanged = 'ChildChanged',       // 子节点变化
+  PropsChanged = 'PropsChanged',       // 属性变化
+  VisibleChanged = 'VisibleChanged',   // 可见性变化
+  MinimalRenderUnit = 'MinimalRenderUnit', // 最小渲染单元（性能优化模式）
 }
 
-// 缓存 Leaf 层组件，防止重新渲染问题
+/**
+ * 🗂️ LeafCache 缓存类
+ *
+ * 作用：在设计态缓存组件相关数据，避免不必要的重新创建和性能问题
+ *
+ * 为什么需要缓存？
+ * 1. **组件缓存（component）**：避免每次渲染都创建新的 LeafWrapper 类
+ * 2. **状态缓存（state）**：保持组件状态，即使组件被销毁重建
+ * 3. **事件缓存（event）**：管理事件监听器的生命周期
+ * 4. **引用缓存（ref）**：存储组件方法引用（如 makeUnitRender）
+ *
+ * 缓存粒度：documentId + device
+ * - 不同文档独立缓存
+ * - 不同设备（desktop/mobile）独立缓存
+ */
 class LeafCache {
 
-  /** 组件缓存 */
+  /**
+   * 组件缓存
+   * key: schema.id, value: { Comp, LeafWrapper }
+   * 用途：避免重复创建 LeafWrapper 类
+   */
   component = new Map();
 
   /**
-   * 状态缓存，场景：属性变化后，改组件被销毁，state 为空，没有展示修改后的属性
+   * 状态缓存
+   * key: schema.id, value: IComponentHocState
+   *
+   * 场景：
+   * 用户修改组件属性 → 组件被销毁重建 → 如果没有缓存，state 会丢失 → 修改的属性看不到
+   * 有了缓存 → 重建时恢复上次的 state → 修改的属性能正常显示
    */
   state = new Map();
 
   /**
-   * 订阅事件缓存，导致 rerender 的订阅事件
+   * 订阅事件缓存
+   * key: schema.id, value: { clear: boolean, dispose: Function[] }
+   *
+   * 用途：
+   * - 记录每个组件订阅的事件监听器
+   * - 组件卸载时自动清理，防止内存泄漏
    */
   event = new Map();
 
+  /**
+   * 引用缓存
+   * key: schema.id, value: { makeUnitRender: Function }
+   *
+   * 用途：
+   * - 存储最小渲染单元的触发方法
+   * - 外部可调用触发局部渲染
+   */
   ref = new Map();
 
+  /**
+   * 构造函数
+   * @param documentId - 文档 ID（不同文档独立缓存）
+   * @param device - 设备类型（desktop/mobile 独立缓存）
+   */
   constructor(public documentId: string, public device: string) {
   }
 }
@@ -542,40 +640,82 @@ export function leafWrapper(Comp: types.IBaseRenderComponent, {
       return this.props.children;
     }
 
+    /**
+     * 🔥 获取设计器 Node 对象（核心属性）
+     *
+     * 获取流程：
+     * 1. 优先使用 props._leaf（从外部传入）
+     * 2. 如果 _leaf 是 mock 对象，返回 undefined（低代码组件整体更新场景）
+     * 3. 否则通过 getNode(componentCacheId) 从设计器获取 Node 对象
+     *
+     * Node 对象的作用：
+     * - 提供 schema 导出：leaf.export(IPublicEnumTransformStage.Render)
+     * - 监听属性变化：leaf.onPropChange(handler)
+     * - 监听子节点变化：leaf.onChildrenChange(handler)
+     * - 监听显隐变化：leaf.onVisibleChange(handler)
+     * - 访问组件元信息：leaf.componentName, leaf.id
+     *
+     * @returns Node 对象或 undefined
+     */
     get leaf(): INode | undefined {
+      // 场景：低代码组件作为一个整体更新，其内部的组件不需要监听相关事件
       if (this.props._leaf?.isMock) {
-        // 低代码组件作为一个整体更新，其内部的组件不需要监听相关事件
         return undefined;
       }
 
+      // 从设计器获取 Node 对象（通过 getNode 方法，由 baseRenderer.props.getNode 提供）
       return getNode?.(componentCacheId);
     }
 
+    /**
+     * 🎨 渲染方法
+     *
+     * 核心流程：
+     * 1. 检查可见性和条件：不满足则返回 null
+     * 2. 合并 props：
+     *    - this.props（包含 _leaf、componentId、__tag 等）
+     *    - this.state.nodeCacheProps（缓存的 props）
+     *    - this.state.nodeProps（从 schema 解析的 props）
+     * 3. 🔥 **关键**：_leaf 属性会通过 ...rest 传递给原组件
+     * 4. 渲染原组件（Comp），传递合并后的 props
+     *
+     * 结果：
+     * 原组件接收到的 props 包含 _leaf 属性
+     * 业务组件可以通过 props._leaf 访问设计器 Node 对象
+     *
+     * 示例：
+     * <MyComponent _leaf={node} __id="xxx" {...otherProps} />
+     */
     render() {
+      // 不可见或条件为 false，不渲染
       if (!this.state.visible || !this.state.condition) {
         return null;
       }
 
       const {
-        forwardedRef,
-        ...rest
+        forwardedRef,  // 转发的 ref
+        ...rest        // 🔥 其他所有 props（包括 _leaf、componentId、__tag 等）
       } = this.props;
 
+      // 合并所有 props
       const compProps = {
-        ...rest,
-        ...(this.state.nodeCacheProps || {}),
-        ...(this.state.nodeProps || {}),
+        ...rest,                               // 🔥 _leaf 在这里传递给原组件
+        ...(this.state.nodeCacheProps || {}),  // 缓存的 props
+        ...(this.state.nodeProps || {}),       // 从 schema 解析的 props
         children: [],
-        __id: this.props.componentId,
-        ref: forwardedRef,
+        __id: this.props.componentId,          // 组件 ID
+        ref: forwardedRef,                     // 转发 ref
       };
 
+      // 删除内部属性（不传递给原组件）
       delete compProps.__inner__;
 
+      // 如果有子节点，传递 children
       if (this.hasChildren) {
         return engine.createElement(Comp, compProps, this.children);
       }
 
+      // 没有子节点，直接渲染
       return engine.createElement(Comp, compProps);
     }
   }
