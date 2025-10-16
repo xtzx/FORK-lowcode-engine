@@ -1,3 +1,79 @@
+/**
+ * @file Project 项目管理器
+ * @description 管理低代码项目的多文档、组件库、国际化等
+ *
+ * 核心功能：
+ * 1. 多文档管理：管理多个页面/组件文档
+ * 2. Schema 导入导出：load/getSchema 处理整个项目数据
+ * 3. 文档切换：open 切换当前编辑的文档
+ * 4. 模拟器集成：mountSimulator 关联渲染器
+ * 5. 组件库管理：合并所有文档的 componentsMap
+ * 6. 国际化：管理 i18n 配置
+ *
+ * 项目结构：
+ * ```
+ * Project
+ *   ├─ documents: []           // 所有文档（页面）
+ *   │   ├─ document1 (active)  // 当前激活的文档
+ *   │   └─ document2
+ *   ├─ simulator               // 模拟器（iframe 渲染器）
+ *   ├─ componentsMap           // 组件库映射
+ *   ├─ i18n                    // 国际化配置
+ *   └─ config                  // 项目配置
+ * ```
+ *
+ * 文档生命周期：
+ * ```
+ * 1. createDocument(schema) - 创建文档
+ * 2. open(doc) - 打开文档（设为 active）
+ * 3. checkExclusive() - 其他文档挂起（suspense）
+ * 4. doc.close() - 关闭文档
+ * 5. doc.remove() - 移除文档
+ * ```
+ *
+ * Schema 结构：
+ * ```typescript
+ * ProjectSchema {
+ *   version: '1.0.0',
+ *   componentsMap: [              // 组件库
+ *     { package: '@ali/button', version: '1.0.0', componentName: 'Button' }
+ *   ],
+ *   componentsTree: [             // 所有页面
+ *     { componentName: 'Page', fileName: 'page1', children: [...] },
+ *     { componentName: 'Page', fileName: 'page2', children: [...] }
+ *   ],
+ *   i18n: { 'zh-CN': {...}, 'en-US': {...} },
+ *   config: { layout: {...} }
+ * }
+ * ```
+ *
+ * 多文档场景：
+ * - 多页面应用：每个页面一个文档
+ * - 组件库开发：每个组件一个文档
+ * - 低代码 IDE：多个文件同时编辑
+ *
+ * @example
+ * ```typescript
+ * // 创建项目
+ * const project = new Project(designer, schema);
+ *
+ * // 加载 Schema
+ * project.load(schema, true);  // true: 自动打开第一个文档
+ *
+ * // 创建新文档
+ * const doc = project.createDocument({ componentName: 'Page' });
+ *
+ * // 打开文档
+ * project.open(doc);
+ *
+ * // 切换文档
+ * project.open('page2');  // 按 fileName 打开
+ *
+ * // 导出 Schema
+ * const schema = project.getSchema();
+ * ```
+ */
+
 import { obx, computed, makeObservable, action, IEventBus, createModuleEventBus } from '@alilc/lowcode-editor-core';
 import { IDesigner } from '../designer';
 import { DocumentModel, isDocumentModel } from '../document';
@@ -13,6 +89,26 @@ import type {
 import { isLowCodeComponentType, isProCodeComponentType } from '@alilc/lowcode-utils';
 import { ISimulatorHost } from '../simulator';
 
+// ==================== IProject 接口 ====================
+/**
+ * 项目接口
+ *
+ * 说明：
+ * - 继承 IBaseApiProject，提供公共 API
+ * - 省略一些方法，使用内部实现
+ *
+ * 核心属性：
+ * - designer: 所属设计器
+ * - simulator: 模拟器
+ * - currentDocument: 当前文档
+ * - documents: 所有文档
+ * - i18n: 国际化配置
+ *
+ * 核心方法：
+ * - load/getSchema: 导入导出
+ * - open/createDocument: 文档管理
+ * - mountSimulator: 模拟器集成
+ */
 export interface IProject extends Omit<IBaseApiProject<
   IDocumentModel
 >,
@@ -35,41 +131,90 @@ export interface IProject extends Omit<IBaseApiProject<
   'createDocument' |
   'getDocumentByFileName'
 > {
-
+  /**
+   * 所属设计器
+   */
   get designer(): IDesigner;
 
+  /**
+   * 模拟器（渲染器）
+   */
   get simulator(): ISimulatorHost | null;
 
+  /**
+   * 当前激活的文档
+   */
   get currentDocument(): IDocumentModel | null | undefined;
 
+  /**
+   * 所有文档列表
+   */
   get documents(): IDocumentModel[];
 
+  /**
+   * 国际化配置
+   */
   get i18n(): {
     [local: string]: {
       [key: string]: any;
     };
   };
 
+  /**
+   * 挂载模拟器
+   */
   mountSimulator(simulator: ISimulatorHost): void;
 
+  /**
+   * 打开文档
+   *
+   * @param doc - 文档（可以是文档对象、文档ID、fileName 或 Schema）
+   */
   open(doc?: string | IDocumentModel | IPublicTypeRootSchema): IDocumentModel | null;
 
+  /**
+   * 根据文件名获取文档
+   */
   getDocumentByFileName(fileName: string): IDocumentModel | null;
 
+  /**
+   * 创建新文档
+   */
   createDocument(data?: IPublicTypeRootSchema): IDocumentModel;
 
+  /**
+   * 加载项目 Schema
+   *
+   * @param schema - 项目 Schema
+   * @param autoOpen - 是否自动打开（true: 打开第一个，string: 打开指定文件）
+   */
   load(schema?: IPublicTypeProjectSchema, autoOpen?: boolean | string): void;
 
+  /**
+   * 获取项目 Schema
+   */
   getSchema(
     stage?: IPublicEnumTransformStage,
   ): IPublicTypeProjectSchema;
 
+  /**
+   * 根据 ID 获取文档
+   */
   getDocument(id: string): IDocumentModel | null;
 
+  /**
+   * 监听当前文档变化
+   */
   onCurrentDocumentChange(fn: (doc: IDocumentModel) => void): () => void;
 
+  /**
+   * 监听模拟器就绪
+   */
   onSimulatorReady(fn: (args: any) => void): () => void;
 
+  /**
+   * 监听渲染器就绪
+   */
   onRendererReady(fn: () => void): () => void;
 
   /**
@@ -85,11 +230,40 @@ export interface IProject extends Omit<IBaseApiProject<
   get<T>(key: string): T;
   get(key: string): unknown;
 
+  /**
+   * 检查并处理文档互斥（挂起其他文档）
+   */
   checkExclusive(activeDoc: DocumentModel): void;
 
+  /**
+   * 设置渲染器就绪
+   */
   setRendererReady(renderer: IPublicTypeSimulatorRenderer<any, any>): void;
 }
 
+// ==================== Project 类 ====================
+/**
+ * 项目类
+ *
+ * 职责：
+ * - 管理多个文档
+ * - 处理 Schema 导入导出
+ * - 协调模拟器和文档
+ * - 管理项目级配置
+ *
+ * 核心数据：
+ * ```typescript
+ * {
+ *   documents: [doc1, doc2],      // 所有文档
+ *   currentDocument: doc1,        // 当前文档
+ *   documentsMap: Map,            // 文档映射
+ *   data: ProjectSchema,          // 项目数据
+ *   _simulator: ISimulatorHost,   // 模拟器
+ *   _config: any,                 // 项目配置
+ *   _i18n: any,                   // 国际化
+ * }
+ * ```
+ */
 export class Project implements IProject {
   private emitter: IEventBus = createModuleEventBus('Project');
 

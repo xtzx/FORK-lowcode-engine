@@ -1,28 +1,106 @@
+/**
+ * @file PaneController 面板控制器
+ * @description 大纲树面板的控制器，实现拖拽传感器、滚动控制和面板交互
+ *
+ * 核心职责：
+ * 1. 实现拖拽传感器（IPublicModelSensor）：检测拖拽位置
+ * 2. 实现滚动控制（IPublicTypeScrollable）：自动滚动
+ * 3. 实现面板接口（ITreeBoard）：滚动到节点
+ * 4. 管理缩进追踪（IndentTrack）：层级调整
+ * 5. 管理停留计时（DwellTimer）：自动展开
+ *
+ * 三大接口实现：
+ * ```
+ * PaneController
+ * ├── IPublicModelSensor（传感器）
+ * │   ├── fixEvent: 修正事件坐标
+ * │   ├── locate: 定位拖放位置
+ * │   └── isEnter: 判断是否进入
+ * │
+ * ├── ITreeBoard（面板）
+ * │   └── scrollToNode: 滚动到节点
+ * │
+ * └── IPublicTypeScrollable（可滚动）
+ *     ├── bounds: 面板边界
+ *     └── scrollTarget: 滚动目标
+ * ```
+ *
+ * 传感器（Sensor）概念：
+ * - 拖拽系统的核心组件
+ * - 负责检测拖拽目标和位置
+ * - 大纲树作为一个传感器，接收拖拽事件
+ * - 计算插入位置，创建 DropLocation
+ *
+ * 工作流程：
+ * ```
+ * 1. 用户开始拖拽
+ * 2. dragon.addSensor(paneController)
+ * 3. 鼠标移动到大纲树
+ * 4. paneController.locate(event)
+ * 5. 计算插入位置
+ * 6. canvas.createLocation(...)
+ * 7. 显示插入线
+ * 8. 用户松开鼠标
+ * 9. 根据 location 插入节点
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // 创建面板控制器
+ * const controller = new PaneController('MasterPane', treeMaster);
+ *
+ * // 设置面板 DOM
+ * controller.setShell(panelElement);
+ *
+ * // 控制器自动：
+ * // - 注册为拖拽传感器
+ * // - 监听拖拽事件
+ * // - 计算插入位置
+ * // - 处理缩进调整
+ * ```
+ */
+
 /* eslint-disable max-len */
-import requestIdleCallback, { cancelIdleCallback } from 'ric-shim';
+import requestIdleCallback, { cancelIdleCallback } from 'ric-shim';  // 空闲时回调
 import {
-  uniqueId,
-  isDragNodeObject,
-  isDragAnyObject,
-  isLocationChildrenDetail,
+  uniqueId,  // 生成唯一ID
+  isDragNodeObject,  // 判断拖拽对象是否是节点
+  isDragAnyObject,  // 判断是否是拖拽对象
+  isLocationChildrenDetail,  // 判断位置详情是否是Children类型
 } from '@alilc/lowcode-utils';
 import {
-  IPublicModelDragObject,
-  IPublicTypeScrollable,
-  IPublicModelSensor,
-  IPublicTypeLocationChildrenDetail,
-  IPublicTypeLocationDetailType,
-  IPublicModelNode,
-  IPublicModelDropLocation,
-  IPublicModelScroller,
-  IPublicModelScrollTarget,
-  IPublicModelLocateEvent,
+  IPublicModelDragObject,  // 拖拽对象模型
+  IPublicTypeScrollable,  // 可滚动接口
+  IPublicModelSensor,  // 传感器接口
+  IPublicTypeLocationChildrenDetail,  // Children位置详情
+  IPublicTypeLocationDetailType,  // 位置详情类型枚举
+  IPublicModelNode,  // 设计器节点
+  IPublicModelDropLocation,  // 拖放位置
+  IPublicModelScroller,  // 滚动器
+  IPublicModelScrollTarget,  // 滚动目标
+  IPublicModelLocateEvent,  // 定位事件
 } from '@alilc/lowcode-types';
 import TreeNode from './tree-node';
-import { IndentTrack } from '../helper/indent-track';
-import DwellTimer from '../helper/dwell-timer';
+import { IndentTrack } from '../helper/indent-track';  // 缩进追踪器
+import DwellTimer from '../helper/dwell-timer';  // 停留计时器
 import { IOutlinePanelPluginContext, ITreeBoard, TreeMaster } from './tree-master';
 
+// ==================== PaneController 类 ====================
+/**
+ * 面板控制器类
+ *
+ * 实现三大接口：
+ * - IPublicModelSensor: 拖拽传感器
+ * - ITreeBoard: 树面板
+ * - IPublicTypeScrollable: 可滚动容器
+ *
+ * 职责：
+ * - 检测拖拽并计算插入位置
+ * - 处理缩进调整（IndentTrack）
+ * - 处理停留展开（DwellTimer）
+ * - 管理面板滚动
+ * - 提供滚动到节点功能
+ */
 export class PaneController implements IPublicModelSensor, ITreeBoard, IPublicTypeScrollable {
   private pluginContext: IOutlinePanelPluginContext;
 

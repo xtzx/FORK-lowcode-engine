@@ -1,70 +1,269 @@
+/**
+ * @file Dragon 拖拽引擎
+ * @description 低代码设计器的核心拖拽系统，处理所有拖拽交互
+ *
+ * 📌 核心地位：
+ * - Dragon 是拖拽交互的核心引擎
+ * - 管理所有传感器（Sensor）
+ * - 处理拖拽的完整生命周期
+ * - 协调拖拽位置计算
+ *
+ * 🎯 核心职责：
+ * 1. 拖拽启动：boost() 方法启动拖拽
+ * 2. 传感器管理：注册和协调多个传感器
+ * 3. 位置计算：locate() 计算插入位置
+ * 4. 事件分发：onDragstart、onDrag、onDragend
+ * 5. 状态管理：dragging、canDrop 等状态
+ * 6. 跨文档：支持多个 iframe 的拖拽
+ *
+ * 🏗️ 拖拽架构：
+ * ```
+ * Dragon（拖拽引擎）
+ * ├── Sensors（传感器）
+ * │   ├── CanvasSensor（画布传感器）
+ * │   ├── PanelSensor（面板传感器）
+ * │   └── TreeSensor（大纲树传感器）
+ * ├── DragObject（拖拽对象）
+ * │   ├── Node：拖拽已有节点
+ * │   ├── NodeData：拖拽组件数据
+ * │   └── Any：拖拽任意对象
+ * └── DropLocation（放置位置）
+ *     ├── target：目标节点
+ *     ├── detail：位置详情
+ *     └── valid：是否有效
+ * ```
+ *
+ * 🔄 拖拽流程：
+ * ```
+ * 1. mousedown：鼠标按下
+ * 2. boost()：启动拖拽
+ * 3. mousemove：鼠标移动
+ * 4. locate()：计算位置（传感器）
+ * 5. createLocation()：创建 DropLocation
+ * 6. mouseup：鼠标松开
+ * 7. drop()：执行放置
+ * 8. end()：结束拖拽
+ * ```
+ *
+ * 🎨 传感器（Sensor）概念：
+ * - 传感器负责检测拖拽目标
+ * - 不同区域有不同的传感器
+ * - 画布、大纲树、属性面板都是传感器
+ * - 传感器返回 DropLocation
+ *
+ * 📚 隐藏知识点：
+ * 1. 抖动检测（isShaken）：区分点击和拖拽
+ * 2. 跨文档事件：makeEventsHandler 处理多 iframe
+ * 3. 传感器优先级：多个传感器的协调
+ * 4. 原生选择禁用：拖拽时禁用文本选择
+ * 5. 光标状态：cursor.setDragging()
+ * 6. 复制模式：Ctrl/Cmd + 拖拽
+ *
+ * @example
+ * ```typescript
+ * // 启动拖拽
+ * dragon.boost({
+ *   type: DragObjectType.Node,
+ *   nodes: [buttonNode]
+ * }, mouseEvent);
+ *
+ * // 监听拖拽事件
+ * dragon.onDragstart(() => {
+ *   console.log('拖拽开始');
+ * });
+ *
+ * dragon.onDragend(() => {
+ *   console.log('拖拽结束');
+ * });
+ * ```
+ */
+
 import { obx, makeObservable, IEventBus, createModuleEventBus } from '@alilc/lowcode-editor-core';
 import {
-    IPublicTypeDragNodeObject,
-    IPublicTypeDragAnyObject,
-    IPublicEnumDragObjectType,
-    IPublicTypeDragNodeDataObject,
-    IPublicModelDragObject,
-    IPublicModelNode,
-    IPublicModelDragon,
-    IPublicModelLocateEvent,
-    IPublicModelSensor,
+    IPublicTypeDragNodeObject,  // 拖拽节点对象类型
+    IPublicTypeDragAnyObject,  // 拖拽任意对象类型
+    IPublicEnumDragObjectType,  // 拖拽对象类型枚举
+    IPublicTypeDragNodeDataObject,  // 拖拽节点数据对象类型
+    IPublicModelDragObject,  // 拖拽对象模型
+    IPublicModelNode,  // 节点模型
+    IPublicModelDragon,  // Dragon 模型接口
+    IPublicModelLocateEvent,  // 定位事件模型
+    IPublicModelSensor,  // 传感器模型
 } from '@alilc/lowcode-types';
-import { setNativeSelection, cursor } from '@alilc/lowcode-utils';
-import { INode, Node } from '../document';
-import { ISimulatorHost, isSimulatorHost } from '../simulator';
-import { IDesigner } from './designer';
-import { makeEventsHandler } from '../utils/misc';
+import { setNativeSelection, cursor } from '@alilc/lowcode-utils';  // 选择和光标工具
+import { INode, Node } from '../document';  // 节点相关
+import { ISimulatorHost, isSimulatorHost } from '../simulator';  // 模拟器相关
+import { IDesigner } from './designer';  // 设计器接口
+import { makeEventsHandler } from '../utils/misc';  // 跨文档事件处理
 
+// ==================== ILocateEvent 接口 ====================
+/**
+ * 定位事件接口
+ *
+ * 继承：IPublicModelLocateEvent
+ *
+ * 扩展字段：
+ * - sensor: 当前激活的传感器
+ *
+ * 定位事件：
+ * - 拖拽过程中的鼠标事件
+ * - 包含位置信息
+ * - 用于计算插入位置
+ */
 export interface ILocateEvent extends IPublicModelLocateEvent {
-    readonly type: 'LocateEvent';
+    readonly type: 'LocateEvent';  // 事件类型标识
 
     /**
-     * 激活的感应器
+     * 激活的传感器
+     *
+     * 说明：
+     * - 当前响应拖拽的传感器
+     * - 可能是画布、大纲树、面板等
+     * - 用于判断拖拽位置
      */
     sensor?: IPublicModelSensor;
 }
 
+// ==================== 类型守卫函数（废弃）====================
 /**
- * @deprecated use same function in @alilc/lowcode-utils
+ * 判断是否是拖拽节点对象
+ *
+ * @deprecated 已废弃，使用 @alilc/lowcode-utils 中的同名函数
+ *
+ * 保留原因：向后兼容
  */
 export function isDragNodeObject(obj: any): obj is IPublicTypeDragNodeObject {
     return obj && obj.type === IPublicEnumDragObjectType.Node;
 }
 
 /**
- * @deprecated use same function in @alilc/lowcode-utils
+ * 判断是否是拖拽节点数据对象
+ *
+ * @deprecated 已废弃，使用 @alilc/lowcode-utils 中的同名函数
  */
 export function isDragNodeDataObject(obj: any): obj is IPublicTypeDragNodeDataObject {
     return obj && obj.type === IPublicEnumDragObjectType.NodeData;
 }
 
 /**
- * @deprecated use same function in @alilc/lowcode-utils
+ * 判断是否是拖拽任意对象
+ *
+ * @deprecated 已废弃，使用 @alilc/lowcode-utils 中的同名函数
  */
 export function isDragAnyObject(obj: any): obj is IPublicTypeDragAnyObject {
     return obj && obj.type !== IPublicEnumDragObjectType.NodeData && obj.type !== IPublicEnumDragObjectType.Node;
 }
 
+/**
+ * 判断是否是定位事件
+ *
+ * @param e - 事件对象
+ * @returns true - 是定位事件，false - 不是
+ *
+ * 类型守卫：
+ * - 用于 TypeScript 类型收窄
+ * - e is ILocateEvent 语法
+ */
 export function isLocateEvent(e: any): e is ILocateEvent {
     return e && e.type === 'LocateEvent';
 }
 
+// ==================== 常量：抖动距离 ====================
+/**
+ * 抖动距离阈值（像素）
+ *
+ * 值：4px
+ *
+ * 用途：
+ * - 区分点击和拖拽
+ * - 鼠标移动超过 4px 算拖拽
+ * - 小于 4px 算点击
+ *
+ * 为什么是 4px？
+ * - 经过用户体验测试
+ * - 太小：误触拖拽
+ * - 太大：拖拽不灵敏
+ * - 4px 是最佳平衡点
+ */
 const SHAKE_DISTANCE = 4;
 
+// ==================== 工具函数：抖动检测 ====================
 /**
- * mouse shake check
+ * 检测鼠标是否抖动（移动）
+ *
+ * @param e1 - 第一个事件（mousedown）
+ * @param e2 - 第二个事件（当前）
+ * @returns true - 抖动（拖拽），false - 未抖动（点击）
+ *
+ * 判断条件（满足任一）：
+ * 1. e1 已标记为 shaken
+ * 2. 事件目标不同（target 变化）
+ * 3. 移动距离超过阈值
+ *
+ * 距离计算：
+ * ```typescript
+ * distance = √((y2-y1)² + (x2-x1)²)
+ * isShaken = distance > 4
+ * ```
+ *
+ * 使用场景：
+ * ```typescript
+ * // mousedown 时记录事件
+ * this.boostEvent = e;
+ *
+ * // mouseup 时检查
+ * if (isShaken(this.boostEvent, e)) {
+ *   // 鼠标移动了，是拖拽
+ * } else {
+ *   // 鼠标没移动，是点击
+ * }
+ * ```
+ *
+ * 为什么需要检测？
+ * - 区分用户意图
+ * - 点击：选中节点
+ * - 拖拽：移动节点
+ * - 不同的处理逻辑
  */
 export function isShaken(e1: MouseEvent | DragEvent, e2: MouseEvent | DragEvent): boolean {
+    // 已标记为 shaken
     if ((e1 as any).shaken) {
         return true;
     }
+
+    // 目标元素变化
     if (e1.target !== e2.target) {
         return true;
     }
+
+    // 计算移动距离（勾股定理）
+    // (y2-y1)² + (x2-x1)² > 4
     return Math.pow(e1.clientY - e2.clientY, 2) + Math.pow(e1.clientX - e2.clientX, 2) > SHAKE_DISTANCE;
 }
 
+/**
+ * 检测是否是无效点
+ *
+ * @param e - 当前事件
+ * @param last - 上一个事件
+ * @returns true - 无效点，false - 有效点
+ *
+ * 无效点定义：
+ * - 当前坐标为 (0, 0)
+ * - 与上一个点的距离大于 5px
+ *
+ * 为什么会出现无效点？
+ * - 某些浏览器事件异常
+ * - iframe 切换时的瞬间
+ * - 需要过滤掉
+ *
+ * 使用：
+ * ```typescript
+ * if (isInvalidPoint(e, lastEvent)) {
+ *   return;  // 忽略无效点
+ * }
+ * ```
+ */
 export function isInvalidPoint(e: any, last: any): boolean {
     return (
         e.clientX === 0 &&
@@ -74,12 +273,96 @@ export function isInvalidPoint(e: any, last: any): boolean {
     );
 }
 
+/**
+ * 检测两个事件是否在同一位置
+ *
+ * @param e1 - 第一个事件
+ * @param e2 - 第二个事件
+ * @returns true - 位置相同，false - 位置不同
+ *
+ * 用途：
+ * - 判断鼠标是否移动
+ * - 优化：位置未变不重复计算
+ */
 export function isSameAs(e1: MouseEvent | DragEvent, e2: MouseEvent | DragEvent): boolean {
     return e1.clientY === e2.clientY && e1.clientX === e2.clientX;
 }
 
+/**
+ * 标记事件为已抖动
+ *
+ * @param e - 事件对象
+ *
+ * 功能：
+ * - 在事件对象上添加 shaken 属性
+ * - 标记为 true
+ * - 后续检查时快速判断
+ */
 export function setShaken(e: any) {
     e.shaken = true;
+}
+
+/**
+ * 获取拖拽对象的源传感器
+ *
+ * @param dragObject - 拖拽对象
+ * @returns 源传感器（模拟器）或 null
+ *
+ * 功能：
+ * - 从拖拽对象提取源传感器
+ * - 只有拖拽节点才有源
+ * - 其他类型返回 null
+ *
+ * 使用场景：
+ * ```typescript
+ * // 拖拽节点时：
+ * const sourceSensor = getSourceSensor(dragObject);
+ * // -> 节点所在的 Simulator
+ *
+ * // 从组件库拖拽时：
+ * const sourceSensor = getSourceSensor(dragObject);
+ * // -> null（不是从画布拖出）
+ * ```
+ */
+function getSourceSensor(dragObject: IPublicModelDragObject): ISimulatorHost | null {
+    // 只有拖拽节点对象才有源
+    if (!isDragNodeObject(dragObject)) {
+        return null;
+    }
+    // 返回第一个节点的模拟器
+    return dragObject.nodes[0]?.document?.simulator || null;
+}
+
+/**
+ * 判断是否是原生拖拽事件
+ *
+ * @param e - 事件对象
+ * @returns true - 是 DragEvent，false - 是 MouseEvent
+ *
+ * 判断方法：
+ * - 事件类型以 'drag' 开头
+ * - 如：dragstart、drag、dragend
+ *
+ * 为什么需要区分？
+ * - DragEvent 和 MouseEvent 处理不同
+ * - DragEvent 有 dataTransfer
+ * - MouseEvent 更常用
+ */
+function isDragEvent(e: any): e is DragEvent {
+    return e?.type?.startsWith('drag');
+}
+
+// ==================== IDragon 接口 ====================
+/**
+ * Dragon 接口
+ *
+ * 继承：IPublicModelDragon
+ *
+ * 扩展：
+ * - emitter: 事件总线（内部使用）
+ */
+export interface IDragon extends IPublicModelDragon<INode, ILocateEvent> {
+    emitter: IEventBus;  // 事件总线
 }
 
 function getSourceSensor(dragObject: IPublicModelDragObject): ISimulatorHost | null {

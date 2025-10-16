@@ -1,9 +1,87 @@
+/**
+ * @file Scroller 自动滚动系统
+ * @description 实现拖拽到边缘时的自动滚动功能
+ *
+ * 核心功能：
+ * 1. 边缘检测：检测鼠标是否靠近边缘
+ * 2. 自动滚动：滚动到指定位置（动画）
+ * 3. 持续滚动：拖拽在边缘时持续滚动
+ * 4. 缓动动画：平滑的滚动效果
+ *
+ * 工作原理：
+ * ```
+ * 1. 拖拽时调用 scrolling(point)
+ * 2. 检查鼠标是否在边缘（30px 范围）
+ * 3. 计算滚动加速度（距离越近越快）
+ * 4. 使用 requestAnimationFrame 持续滚动
+ * 5. 鼠标离开边缘时停止
+ * ```
+ *
+ * 边缘区域：
+ * ```
+ * ┌─────────────────────────┐
+ * │ ↓ 30px 边缘区域         │
+ * │ ←→                     ←→│
+ * │                         │
+ * │                         │
+ * │                    30px ↑│
+ * └─────────────────────────┘
+ * ```
+ *
+ * 使用场景：
+ * - 拖拽到画布边缘
+ * - 拖拽到大纲树边缘
+ * - 拖拽到面板边缘
+ *
+ * @example
+ * ```typescript
+ * // 创建滚动器
+ * const scroller = new Scroller(scrollable);
+ *
+ * // 拖拽时调用
+ * dragon.onDrag((event) => {
+ *   scroller.scrolling({
+ *     globalX: event.clientX,
+ *     globalY: event.clientY
+ *   });
+ * });
+ *
+ * // 拖拽结束取消
+ * dragon.onDragend(() => {
+ *   scroller.cancel();
+ * });
+ * ```
+ */
+
 import { isElement } from '@alilc/lowcode-utils';
 import { IPublicModelScrollTarget, IPublicTypeScrollable, IPublicModelScroller } from '@alilc/lowcode-types';
 
+// ==================== IScrollTarget 接口 ====================
+/**
+ * 滚动目标接口
+ *
+ * 说明：
+ * - 封装 Window 或 Element 的滚动操作
+ * - 提供统一的滚动接口
+ */
 export interface IScrollTarget extends IPublicModelScrollTarget {
 }
 
+// ==================== ScrollTarget 类 ====================
+/**
+ * 滚动目标类
+ *
+ * 职责：
+ * - 封装 Window 或 Element
+ * - 提供统一的滚动方法
+ * - 兼容不同的滚动属性
+ *
+ * 为什么需要封装？
+ * - Window 和 Element 的滚动属性不同
+ * - Window: scrollX/scrollY
+ * - Element: scrollLeft/scrollTop
+ * - 需要统一接口
+ */
 export class ScrollTarget implements IScrollTarget {
   get left() {
     return 'scrollX' in this.target ? this.target.scrollX : this.target.scrollLeft;

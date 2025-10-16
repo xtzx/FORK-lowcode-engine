@@ -1,0 +1,79 @@
+
+graph TB
+Start([开始]) --> Init[index.ts 导出渲染器实例]
+Init --> HostConnect[host.ts 连接设计器]
+subgraph 初始化阶段
+HostConnect --> CreateContainer[创建 SimulatorRendererContainer]
+CreateContainer --> InitMobX[启用 MobX 响应式]
+InitMobX --> ConnectHost[连接 host 建立双向通信]
+ConnectHost --> SyncConfig[同步配置: layout/components/designMode/device/locale]
+SyncConfig --> CreateHistory[创建内存路由 MemoryHistory]
+CreateHistory --> ListenDocs[监听文档列表变化]
+ListenDocs --> InitContext[初始化应用上下文]
+InitContext --> LoadComponents[消费组件资源]
+end
+LoadComponents --> RunRenderer[调用 run 启动渲染器]
+subgraph 渲染阶段
+RunRenderer --> CreateDOM[创建 DOM 容器 #app]
+CreateDOM --> RenderRoot[渲染根组件 SimulatorRendererView]
+RenderRoot --> Router[Router: 内存路由容器]
+Router --> Layout{Layout: 是否有布局配置?}
+Layout -->|是| ApplyLayout[应用布局组件]
+Layout -->|否| Fragment[使用 Fragment]
+ApplyLayout --> Routes
+Fragment --> Routes[Routes: 路由配置]
+Routes --> MapDocs[遍历文档实例]
+MapDocs --> CreateRoute[为每个文档创建 Route]
+CreateRoute --> RendererComp[Renderer: 核心渲染组件]
+end
+subgraph Schema渲染阶段
+RendererComp --> CheckRender{检查是否允许渲染?}
+CheckRender -->|否| ReturnNull[返回 null]
+CheckRender -->|是| GetSchema[从 DocumentInstance 获取 Schema]
+GetSchema --> LowCodeRenderer[LowCodeRenderer: 低代码渲染器]
+LowCodeRenderer --> TraverseSchema[遍历 Schema 树]
+TraverseSchema --> CustomCreate[customCreateElement: 自定义创建元素]
+CustomCreate --> Extract[提取 __id 和其他属性]
+Extract --> GetNode[从 documentInstance 获取节点]
+GetNode --> CheckContainer{是否为空容器?}
+CheckContainer -->|是| AddPlaceholder[添加占位符]
+CheckContainer -->|否| InterceptEvents[拦截设计态事件]
+AddPlaceholder --> InterceptEvents
+InterceptEvents --> CheckLock{是否锁定?}
+CheckLock -->|是| ShowLockMsg[显示锁定提示]
+CheckLock -->|否| CheckATag{是否为 a 标签?}
+ShowLockMsg --> CheckATag
+CheckATag -->|是| RemoveHref[移除 href 防止跳转]
+CheckATag -->|否| CheckMenu{是否为 Menu?}
+RemoveHref --> CheckMenu
+CheckMenu -->|是| IgnoreEvents[忽略所有事件]
+CheckMenu -->|否| ValidateComp[验证组件有效性]
+IgnoreEvents --> ValidateComp
+ValidateComp --> CreateElement[createElement 创建实际元素]
+CreateElement --> GetRef[onCompGetRef: 获取组件引用]
+GetRef --> MountInstance[documentInstance.mountInstance挂载实例]
+end
+subgraph 实例挂载阶段
+MountInstance --> CheckNull{instance 是否为 null?}
+CheckNull -->|是| UnmountLogic[卸载逻辑: 过滤已卸载实例]
+CheckNull -->|否| CheckReuse{是否复用其他节点实例?}
+CheckReuse -->|是| UnmountOld[从原节点卸载]
+CheckReuse -->|否| CheckElement{是否为 DOM 元素?}
+UnmountOld --> CheckElement
+CheckElement -->|是| CacheKey[缓存 React 内部 key]
+CheckElement -->|否| HijackUnmount[劫持 componentWillUnmount]
+CacheKey --> MarkSymbol[标记 SYMBOL_VNID 和 SYMBOL_VDID]
+HijackUnmount --> MarkSymbol
+MarkSymbol --> UpdateMap[更新 instancesMap]
+UpdateMap --> NotifyHost[通知 host.setInstance]
+UnmountLogic --> NotifyHost
+end
+NotifyHost --> RecordTime[记录渲染时间]
+RecordTime --> EmitEvent[发送性能监控事件]
+EmitTime --> SetReady[通知设计器渲染就绪]
+SetReady --> End([渲染完成])
+style Start fill:#e1f5e1
+style End fill:#ffe1e1
+style CustomCreate fill:#fff3cd
+style MountInstance fill:#fff3cd
+style LowCodeRenderer fill:#d1ecf1

@@ -1,22 +1,126 @@
+/**
+ * @file ContextMenuActions 右键菜单动作管理
+ * @description 管理设计器的右键菜单系统
+ *
+ * 核心功能：
+ * 1. 菜单动作管理：添加、删除、修改菜单项
+ * 2. 全局右键监听：处理画布、大纲树等区域的右键
+ * 3. 菜单渲染：将动作配置渲染为菜单
+ * 4. 布局调整：自定义菜单布局
+ * 5. 多实例管理：支持多个设计器实例
+ *
+ * 菜单类型：
+ * - NODE_TREE: 大纲树右键菜单
+ * - CANVAS: 画布右键菜单
+ *
+ * 架构：
+ * ```
+ * GlobalContextMenuActions（全局管理器）
+ * ├── contextMenuActionsMap（实例映射）
+ * │   ├── ContextMenuActions（实例1）
+ * │   └── ContextMenuActions（实例2）
+ * └── handleContextMenu（全局右键处理）
+ * ```
+ *
+ * 使用场景：
+ * - 画布上右键节点：显示节点操作菜单
+ * - 大纲树右键：显示树节点操作菜单
+ * - 插件扩展：添加自定义菜单项
+ *
+ * @example
+ * ```typescript
+ * // 添加菜单项
+ * contextMenuActions.addMenuAction({
+ *   name: 'custom',
+ *   title: '自定义操作',
+ *   action: (node) => {
+ *     console.log('执行自定义操作');
+ *   }
+ * });
+ *
+ * // 移除菜单项
+ * contextMenuActions.removeMenuAction('custom');
+ *
+ * // 调整菜单布局
+ * contextMenuActions.adjustMenuLayout((items) => {
+ *   // 添加分隔线
+ *   items.splice(2, 0, { type: 'divider' });
+ *   return items;
+ * });
+ * ```
+ */
+
 import { IPublicTypeContextMenuAction, IPublicEnumContextMenuType, IPublicTypeContextMenuItem, IPublicApiMaterial, IPublicModelPluginContext } from '@alilc/lowcode-types';
 import { IDesigner, INode } from './designer';
 import { createContextMenu, parseContextMenuAsReactNode, parseContextMenuProperties, uniqueId } from '@alilc/lowcode-utils';
-import { Menu } from '@alifd/next';
+import { Menu } from '@alifd/next';  // Fusion Menu 组件
 import { engineConfig } from '@alilc/lowcode-editor-core';
-import './context-menu-actions.scss';
+import './context-menu-actions.scss';  // 样式文件
 
+// ==================== IContextMenuActions 接口 ====================
+/**
+ * 右键菜单动作接口
+ *
+ * 定义右键菜单系统的公开 API
+ *
+ * 核心方法：
+ * - addMenuAction: 添加菜单项
+ * - removeMenuAction: 移除菜单项
+ * - adjustMenuLayout: 调整菜单布局
+ */
 export interface IContextMenuActions {
+  /**
+   * 菜单动作列表
+   *
+   * 说明：
+   * - 所有注册的菜单动作
+   * - 按注册顺序排列
+   */
   actions: IPublicTypeContextMenuAction[];
 
+  /**
+   * 菜单布局调整函数
+   *
+   * 用途：
+   * - 自定义菜单项的顺序
+   * - 添加分隔线
+   * - 分组菜单项
+   */
   adjustMenuLayoutFn: (actions: IPublicTypeContextMenuItem[]) => IPublicTypeContextMenuItem[];
 
+  /**
+   * 添加菜单动作方法
+   *
+   * 类型：与 Material API 的同名方法相同
+   */
   addMenuAction: IPublicApiMaterial['addContextMenuOption'];
 
+  /**
+   * 移除菜单动作方法
+   *
+   * 类型：与 Material API 的同名方法相同
+   */
   removeMenuAction: IPublicApiMaterial['removeContextMenuOption'];
 
+  /**
+   * 调整菜单布局方法
+   *
+   * 类型：与 Material API 的同名方法相同
+   */
   adjustMenuLayout: IPublicApiMaterial['adjustContextMenuLayout'];
 }
 
+/**
+ * 全局菜单布局调整函数
+ *
+ * 说明：
+ * - 默认实现：不调整，直接返回
+ * - 可以通过 adjustMenuLayout 修改
+ *
+ * 用途：
+ * - 跨实例的菜单布局调整
+ * - 全局的菜单定制
+ */
 let adjustMenuLayoutFn: Function = (actions: IPublicTypeContextMenuAction[]) => actions;
 
 export class GlobalContextMenuActions {

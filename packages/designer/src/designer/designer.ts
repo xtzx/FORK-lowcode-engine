@@ -1,152 +1,642 @@
-import { ComponentType } from 'react'; // React 组件类型定义
+/**
+ * @file Designer 设计器主类
+ * @description 低代码设计器的核心协调类，管理和协调所有子系统
+ *
+ * 📌 核心地位：
+ * - Designer 是整个设计器的大脑和指挥中心
+ * - 协调 Project、Document、Node、Dragon 等所有模块
+ * - 提供统一的 API 接口
+ * - 管理全局状态和配置
+ *
+ * 🎯 核心职责：
+ * 1. 模块协调：管理 Project、Dragon、Detecting 等子系统
+ * 2. 组件管理：ComponentMeta 的注册和管理
+ * 3. 拖拽系统：Dragon 拖拽引擎的封装
+ * 4. 事件系统：全局事件的分发
+ * 5. 资源管理：动态加载组件库
+ * 6. 属性转换：Props Transducer 管道
+ * 7. 设置管理：SettingTopEntry 的创建
+ * 8. 快捷键：Hotkeys 的注册和管理
+ * 9. 生命周期：mount、suspend、purge
+ * 10. 工具管理：BEM Tools、ContextMenu 等
+ *
+ * 🏗️ 架构关系：
+ * ```
+ * Engine（引擎）
+ * └── Editor（编辑器）
+ *     └── Designer（设计器）⭐ 本类
+ *         ├── Project（项目）
+ *         │   └── DocumentModel[]（文档）
+ *         │       └── Node[]（节点）
+ *         ├── Dragon（拖拽系统）
+ *         ├── ActiveTracker（激活追踪）
+ *         ├── Detecting（检测系统）
+ *         ├── ComponentMeta Map（组件元数据）
+ *         ├── ComponentActions（组件动作）
+ *         └── ContextMenuActions（右键菜单）
+ * ```
+ *
+ * 🔄 Designer 生命周期：
+ * ```
+ * 1. 创建：new Designer(props)
+ * 2. 初始化：创建所有子系统
+ * 3. 挂载：mount()
+ * 4. 运行：接收操作、协调模块
+ * 5. 暂停：suspend()（可选）
+ * 6. 清理：purge()
+ * ```
+ *
+ * 🎨 核心子系统：
+ * - Project: 管理多个文档（页面）
+ * - Dragon: 拖拽引擎，处理所有拖拽操作
+ * - ActiveTracker: 追踪当前激活的节点
+ * - Detecting: 检测系统，悬停高亮
+ * - ComponentMeta: 组件元数据管理
+ *
+ * 📚 隐藏知识点：
+ * 1. Shell 模型工厂：内部模型到公开 API 的转换
+ * 2. Props Transducer：属性转换管道
+ * 3. 增量资源加载：动态加载组件库
+ * 4. BEM Tools：拖拽辅助工具（边框、插入线等）
+ * 5. OffsetObserver：监听节点位置变化
+ * 6. Scroller：自动滚动系统
+ *
+ * @example
+ * ```typescript
+ * // 创建设计器
+ * const designer = new Designer({
+ *   editor,
+ *   shellModelFactory,
+ *   defaultSchema: pageSchema,
+ *   componentMetadatas: [buttonMeta, inputMeta]
+ * });
+ *
+ * // 使用设计器
+ * const doc = designer.project.createDocument(schema);
+ * designer.dragon.boost(dragObject);
+ * designer.createComponentMeta(componentMeta);
+ * ```
+ */
+
+import { ComponentType } from 'react';
 import {
-    obx, // MobX 响应式装饰器
-    computed, // 计算属性装饰器
-    autorun, // 自动运行函数
-    makeObservable, // 使类可观察
-    IReactionPublic, // 公共响应接口
-    IReactionOptions, // 响应选项
-    IReactionDisposer, // 响应清理器
+    obx,  // MobX 响应式装饰器
+    computed,  // 计算属性装饰器
+    autorun,  // 自动运行函数
+    makeObservable,  // 使类可观察
+    IReactionPublic,  // 公共响应接口
+    IReactionOptions,  // 响应选项
+    IReactionDisposer,  // 响应清理器
 } from '@alilc/lowcode-editor-core';
 import {
-    IPublicTypeProjectSchema, // 项目 Schema 类型
-    IPublicTypeComponentMetadata, // 组件元数据类型
-    IPublicTypeComponentAction, // 组件动作类型
-    IPublicTypeNpmInfo, // NPM 包信息类型
-    IPublicModelEditor, // 编辑器模型接口
-    IPublicTypeCompositeObject, // 复合对象类型
-    IPublicTypePropsList, // 属性列表类型
-    IPublicTypeNodeSchema, // 节点 Schema 类型
-    IPublicTypePropsTransducer, // 属性转换器类型
-    IShellModelFactory, // Shell 模型工厂接口
-    IPublicModelDragObject, // 拖拽对象模型
-    IPublicTypeScrollable, // 可滚动类型
-    IPublicModelScroller, // 滚动器模型
-    IPublicTypeLocationData, // 位置数据类型
-    IPublicEnumTransformStage, // 转换阶段枚举
-    IPublicModelLocateEvent, // 定位事件模型
+    IPublicTypeProjectSchema,  // 项目 Schema 类型
+    IPublicTypeComponentMetadata,  // 组件元数据类型
+    IPublicTypeComponentAction,  // 组件动作类型
+    IPublicTypeNpmInfo,  // NPM 包信息类型
+    IPublicModelEditor,  // 编辑器模型接口
+    IPublicTypeCompositeObject,  // 复合对象类型
+    IPublicTypePropsList,  // 属性列表类型
+    IPublicTypeNodeSchema,  // 节点 Schema 类型
+    IPublicTypePropsTransducer,  // 属性转换器类型
+    IShellModelFactory,  // Shell 模型工厂接口
+    IPublicModelDragObject,  // 拖拽对象模型
+    IPublicTypeScrollable,  // 可滚动类型
+    IPublicModelScroller,  // 滚动器模型
+    IPublicTypeLocationData,  // 位置数据类型
+    IPublicEnumTransformStage,  // 转换阶段枚举
+    IPublicModelLocateEvent,  // 定位事件模型
 } from '@alilc/lowcode-types';
 import {
-    mergeAssets, // 合并资源函数
-    IPublicTypeAssetsJson, // 资源 JSON 类型
-    isNodeSchema, // 判断是否为节点 Schema
-    isDragNodeObject, // 判断是否为拖拽节点对象
-    isDragNodeDataObject, // 判断是否为拖拽节点数据对象
-    isLocationChildrenDetail, // 判断是否为子节点位置详情
-    Logger, // 日志工具
+    mergeAssets,  // 合并资源函数
+    IPublicTypeAssetsJson,  // 资源 JSON 类型
+    isNodeSchema,  // 判断是否为节点 Schema
+    isDragNodeObject,  // 判断是否为拖拽节点对象
+    isDragNodeDataObject,  // 判断是否为拖拽节点数据对象
+    isLocationChildrenDetail,  // 判断是否为子节点位置详情
+    Logger,  // 日志工具
 } from '@alilc/lowcode-utils';
-import { IProject, Project } from '../project'; // 项目相关
-import { Node, DocumentModel, insertChildren, INode, ISelection } from '../document'; // 文档和节点相关
-import { ComponentMeta, IComponentMeta } from '../component-meta'; // 组件元数据相关
-import { INodeSelector, Component } from '../simulator'; // 模拟器相关
-import { Scroller } from './scroller'; // 滚动器
-import { Dragon, IDragon } from './dragon'; // 拖拽系统
-import { ActiveTracker, IActiveTracker } from './active-tracker'; // 活动节点追踪器
-import { Detecting } from './detecting'; // 检测系统
-import { DropLocation } from './location'; // 放置位置
-import { OffsetObserver, createOffsetObserver } from './offset-observer'; // 偏移观察器
-import { ISettingTopEntry, SettingTopEntry } from './setting'; // 设置入口
-import { BemToolsManager } from '../builtin-simulator/bem-tools/manager'; // BEM 工具管理器
-import { ComponentActions } from '../component-actions'; // 组件动作管理
-import { ContextMenuActions, IContextMenuActions } from '../context-menu-actions'; // 右键菜单动作
+import { IProject, Project } from '../project';  // 项目相关
+import { Node, DocumentModel, insertChildren, INode, ISelection } from '../document';  // 文档和节点相关
+import { ComponentMeta, IComponentMeta } from '../component-meta';  // 组件元数据相关
+import { INodeSelector, Component } from '../simulator';  // 模拟器相关
+import { Scroller } from './scroller';  // 滚动器
+import { Dragon, IDragon } from './dragon';  // 拖拽系统
+import { ActiveTracker, IActiveTracker } from './active-tracker';  // 活动节点追踪器
+import { Detecting } from './detecting';  // 检测系统
+import { DropLocation } from './location';  // 放置位置
+import { OffsetObserver, createOffsetObserver } from './offset-observer';  // 偏移观察器
+import { ISettingTopEntry, SettingTopEntry } from './setting';  // 设置入口
+import { BemToolsManager } from '../builtin-simulator/bem-tools/manager';  // BEM 工具管理器
+import { ComponentActions } from '../component-actions';  // 组件动作管理
+import { ContextMenuActions, IContextMenuActions } from '../context-menu-actions';  // 右键菜单动作
 
-// 创建设计器专用日志记录器
+/**
+ * 设计器日志记录器
+ *
+ * 配置：
+ * - level: 'warn' - 只记录警告和错误
+ * - bizName: 'designer' - 业务标识
+ *
+ * 用途：
+ * - 记录设计器运行时的问题
+ * - 调试和错误追踪
+ */
 const logger = new Logger({ level: 'warn', bizName: 'designer' });
 
+// ==================== DesignerProps 接口 ====================
 /**
- * 设计器属性接口定义
- * 定义了初始化 Designer 实例所需的所有配置项
+ * 设计器属性接口
+ *
+ * 定义创建 Designer 实例所需的所有配置项
+ *
+ * 核心配置：
+ * - editor: 编辑器实例（必需）
+ * - shellModelFactory: Shell 模型工厂（必需）
+ * - defaultSchema: 默认项目 Schema
+ * - componentMetadatas: 组件元数据列表
+ *
+ * 可选配置：
+ * - simulatorComponent: 自定义模拟器
+ * - dragGhostComponent: 自定义拖拽幽灵
+ * - hotkeys: 快捷键配置
+ * - onMount/onDragstart/onDrag/onDragend: 生命周期回调
  */
 export interface DesignerProps {
-    [key: string]: any; // 支持扩展属性
-    editor: IPublicModelEditor; // 🔥 关键：编辑器实例，提供全局服务
-    shellModelFactory: IShellModelFactory; // Shell 模型工厂，用于创建 API 包装对象
-    className?: string; // 设计器容器的 CSS 类名
-    style?: object; // 设计器容器的内联样式
-    defaultSchema?: IPublicTypeProjectSchema; // 默认项目 Schema，初始化时加载
-    hotkeys?: object; // 快捷键配置
-    viewName?: string; // 视图名称标识
-    simulatorProps?: Record<string, any> | ((document: DocumentModel) => object); // 模拟器配置，可以是对象或函数
-    simulatorComponent?: ComponentType<any>; // 自定义模拟器组件
-    dragGhostComponent?: ComponentType<any>; // 自定义拖拽幽灵组件
-    suspensed?: boolean; // 是否暂停状态
-    componentMetadatas?: IPublicTypeComponentMetadata[]; // 组件元数据列表
-    globalComponentActions?: IPublicTypeComponentAction[]; // 全局组件动作列表
-    onMount?: (designer: Designer) => void; // 挂载完成回调
-    onDragstart?: (e: IPublicModelLocateEvent) => void; // 拖拽开始回调
-    onDrag?: (e: IPublicModelLocateEvent) => void; // 拖拽中回调
-    onDragend?: (e: {dragObject: IPublicModelDragObject; copy: boolean}, loc?: DropLocation) => void; // 拖拽结束回调
+    [key: string]: any;  // 支持扩展属性
+
+    // ===== 必需配置 =====
+    /**
+     * 编辑器实例
+     *
+     * 作用：
+     * - 提供全局服务（事件总线、配置等）
+     * - 连接各个模块
+     * - Designer 的上层容器
+     */
+    editor: IPublicModelEditor;
+
+    /**
+     * Shell 模型工厂
+     *
+     * 作用：
+     * - 创建公开 API 的包装对象
+     * - 内部模型到公开接口的转换
+     * - 如：Node -> IPublicModelNode
+     */
+    shellModelFactory: IShellModelFactory;
+
+    // ===== 样式配置 =====
+    className?: string;  // 容器 CSS 类名
+    style?: object;  // 容器内联样式
+
+    // ===== Schema 配置 =====
+    /**
+     * 默认项目 Schema
+     *
+     * 用途：
+     * - 初始化时自动加载
+     * - 提供初始页面
+     * - 快速启动
+     */
+    defaultSchema?: IPublicTypeProjectSchema;
+
+    // ===== 功能配置 =====
+    hotkeys?: object;  // 快捷键配置
+    viewName?: string;  // 视图名称标识
+
+    /**
+     * 模拟器配置
+     *
+     * 可以是：
+     * - 对象：固定配置
+     * - 函数：动态配置（根据文档）
+     *
+     * 示例：
+     * ```typescript
+     * // 固定配置：
+     * simulatorProps: { theme: 'dark' }
+     *
+     * // 动态配置：
+     * simulatorProps: (document) => ({
+     *   theme: document.getConfig('theme')
+     * })
+     * ```
+     */
+    simulatorProps?: Record<string, any> | ((document: DocumentModel) => object);
+
+    /**
+     * 自定义模拟器组件
+     *
+     * 用途：
+     * - 替换默认的模拟器
+     * - 实现自定义渲染逻辑
+     */
+    simulatorComponent?: ComponentType<any>;
+
+    /**
+     * 自定义拖拽幽灵组件
+     *
+     * 用途：
+     * - 拖拽时显示的预览
+     * - 自定义拖拽视觉效果
+     */
+    dragGhostComponent?: ComponentType<any>;
+
+    /**
+     * 是否暂停状态
+     *
+     * 用途：
+     * - 初始化时暂停渲染
+     * - 性能优化
+     */
+    suspensed?: boolean;
+
+    /**
+     * 组件元数据列表
+     *
+     * 用途：
+     * - 批量注册组件元数据
+     * - 初始化时加载
+     */
+    componentMetadatas?: IPublicTypeComponentMetadata[];
+
+    /**
+     * 全局组件动作列表
+     *
+     * 用途：
+     * - 所有组件通用的动作
+     * - 如：删除、复制、锁定等
+     */
+    globalComponentActions?: IPublicTypeComponentAction[];
+
+    // ===== 生命周期回调 =====
+    /**
+     * 挂载完成回调
+     *
+     * 触发时机：
+     * - Designer 初始化完成
+     * - 所有子系统创建完毕
+     *
+     * 用途：
+     * - 执行初始化后的操作
+     * - 插件注册
+     * - 自定义初始化
+     */
+    onMount?: (designer: Designer) => void;
+
+    /**
+     * 拖拽开始回调
+     *
+     * 触发时机：
+     * - 用户开始拖拽
+     *
+     * 用途：
+     * - 记录拖拽开始
+     * - 自定义拖拽逻辑
+     */
+    onDragstart?: (e: IPublicModelLocateEvent) => void;
+
+    /**
+     * 拖拽中回调
+     *
+     * 触发时机：
+     * - 拖拽过程中持续触发
+     *
+     * 用途：
+     * - 实时反馈
+     * - 自定义拖拽行为
+     */
+    onDrag?: (e: IPublicModelLocateEvent) => void;
+
+    /**
+     * 拖拽结束回调
+     *
+     * 触发时机：
+     * - 拖拽完成
+     *
+     * 参数：
+     * - dragObject: 拖拽的对象
+     * - copy: 是否是复制模式
+     * - loc: 放置位置
+     *
+     * 用途：
+     * - 记录拖拽结果
+     * - 执行后置操作
+     */
+    onDragend?: (e: {dragObject: IPublicModelDragObject; copy: boolean}, loc?: DropLocation) => void;
 }
 
+// ==================== IDesigner 接口 ====================
 /**
  * Designer 接口定义
- * 定义了设计器对外提供的所有公共方法和属性
+ *
+ * 定义设计器对外提供的所有公共方法和属性
+ *
+ * 核心 API：
+ * - project: 项目管理
+ * - dragon: 拖拽系统
+ * - detecting: 检测系统
+ * - getComponentMeta: 获取组件元数据
+ * - createLocation: 创建放置位置
+ * - loadIncrementalAssets: 加载增量资源
  */
 export interface IDesigner {
-    readonly shellModelFactory: IShellModelFactory; // Shell 模型工厂
+    /**
+     * Shell 模型工厂
+     *
+     * 用途：
+     * - 创建公开 API 的包装对象
+     * - 内部模型 -> 公开接口转换
+     */
+    readonly shellModelFactory: IShellModelFactory;
 
-    viewName: string | undefined; // 视图名称
+    /**
+     * 视图名称
+     *
+     * 用途：
+     * - 标识不同的视图
+     * - 多视图支持
+     */
+    viewName: string | undefined;
 
-    readonly project: IProject; // 🔥 项目实例，管理所有文档
+    /**
+     * 项目实例
+     *
+     * 核心模块：
+     * - 管理所有文档
+     * - 提供文档操作
+     */
+    readonly project: IProject;
 
-    get dragon(): IDragon; // 🔥 拖拽系统实例
+    /**
+     * 拖拽系统
+     *
+     * 核心模块：
+     * - 处理所有拖拽操作
+     * - 管理拖拽状态
+     * - 协调传感器
+     */
+    get dragon(): IDragon;
 
-    get activeTracker(): IActiveTracker; // 活动节点追踪器
+    /**
+     * 活动节点追踪器
+     *
+     * 功能：
+     * - 追踪当前激活的节点
+     * - 鼠标悬停追踪
+     * - 用于属性面板更新
+     */
+    get activeTracker(): IActiveTracker;
 
-    get componentActions(): ComponentActions; // 组件动作管理器
+    /**
+     * 组件动作管理器
+     *
+     * 功能：
+     * - 管理组件的操作动作
+     * - 如：删除、复制、锁定等
+     */
+    get componentActions(): ComponentActions;
 
-    get contextMenuActions(): ContextMenuActions; // 右键菜单动作管理器
+    /**
+     * 右键菜单动作管理器
+     *
+     * 功能：
+     * - 管理右键菜单项
+     * - 动作注册和执行
+     */
+    get contextMenuActions(): ContextMenuActions;
 
-    get editor(): IPublicModelEditor; // 编辑器实例引用
+    /**
+     * 编辑器实例引用
+     *
+     * 用途：
+     * - 访问编辑器服务
+     * - 发送全局事件
+     */
+    get editor(): IPublicModelEditor;
 
-    get detecting(): Detecting; // 检测系统，用于节点检测
+    /**
+     * 检测系统
+     *
+     * 功能：
+     * - 节点检测（悬停高亮）
+     * - 检测状态管理
+     */
+    get detecting(): Detecting;
 
-    get simulatorComponent(): ComponentType<any> | undefined; // 模拟器组件
+    /**
+     * 模拟器组件
+     *
+     * 用途：
+     * - 自定义的模拟器组件
+     * - 替换默认模拟器
+     */
+    get simulatorComponent(): ComponentType<any> | undefined;
 
-    get currentSelection(): ISelection; // 当前选中项管理
+    /**
+     * 当前选中项管理
+     *
+     * 用途：
+     * - 获取当前文档的选中管理器
+     * - 快捷访问
+     */
+    get currentSelection(): ISelection;
 
-    // 创建滚动器
+    // ========== 工具方法 ==========
+
+    /**
+     * 创建滚动器
+     *
+     * @param scrollable - 可滚动对象
+     * @returns 滚动器实例
+     *
+     * 用途：
+     * - 为画布或面板创建自动滚动
+     * - 拖拽到边缘时自动滚动
+     */
     createScroller(scrollable: IPublicTypeScrollable): IPublicModelScroller;
 
-    // 刷新组件元数据映射
+    /**
+     * 刷新组件元数据映射
+     *
+     * 用途：
+     * - 重新构建组件映射表
+     * - 组件库更新后调用
+     */
     refreshComponentMetasMap(): void;
 
-    // 创建偏移观察器
+    /**
+     * 创建偏移观察器
+     *
+     * @param nodeInstance - 节点选择器
+     * @returns 偏移观察器或 null
+     *
+     * 用途：
+     * - 监听节点位置变化
+     * - 用于拖拽辅助线
+     * - BEM Tools 使用
+     */
     createOffsetObserver(nodeInstance: INodeSelector): OffsetObserver | null;
 
     /**
-     * 创建插入位置，考虑放到 dragon 中
+     * 创建插入位置
+     *
+     * @param locationData - 位置数据
+     * @returns DropLocation 实例
+     *
+     * 用途：
+     * - 拖拽时创建插入位置
+     * - 显示插入线
+     * - 计算插入索引
+     *
+     * TODO: 考虑放到 dragon 中
+     * - 位置创建与拖拽相关
+     * - 可能更合适放在 Dragon 类中
      */
     createLocation(locationData: IPublicTypeLocationData<INode>): DropLocation;
 
-    // 获取组件映射表
+    /**
+     * 获取组件映射表
+     *
+     * @returns 组件映射对象
+     *
+     * 结构：{ 组件名: NPM信息或组件类 }
+     *
+     * 用途：
+     * - 获取所有可用组件
+     * - 检查组件是否存在
+     * - 渲染器使用
+     */
     get componentsMap(): {[key: string]: IPublicTypeNpmInfo | Component};
 
-    // 🔥 加载增量资源（动态加载组件）
+    /**
+     * 加载增量资源
+     *
+     * @param incrementalAssets - 增量资源配置
+     * @returns Promise
+     *
+     * 功能：
+     * - 动态加载组件库
+     * - 不需要重新加载整个页面
+     * - 热更新组件
+     *
+     * 使用场景：
+     * ```typescript
+     * // 用户安装新组件库
+     * await designer.loadIncrementalAssets({
+     *   packages: [
+     *     { package: 'antd', version: '5.x', ... }
+     *   ]
+     * });
+     * // 组件库加载完成，可以使用
+     * ```
+     */
     loadIncrementalAssets(incrementalAssets: IPublicTypeAssetsJson): Promise<void>;
 
-    // 获取组件元数据
+    /**
+     * 获取组件元数据
+     *
+     * @param componentName - 组件名称
+     * @param generateMetadata - 生成元数据的函数（可选）
+     * @returns 组件元数据
+     *
+     * 功能：
+     * - 从缓存获取或创建
+     * - 支持动态生成元数据
+     * - 懒加载机制
+     */
     getComponentMeta(
         componentName: string,
         generateMetadata?: () => IPublicTypeComponentMetadata | null,
     ): IComponentMeta;
 
-    // 清除插入位置
+    /**
+     * 清除插入位置
+     *
+     * 功能：
+     * - 清除当前的 dropLocation
+     * - 隐藏插入线
+     * - 拖拽结束时调用
+     */
     clearLocation(): void;
 
-    // 创建组件元数据
+    /**
+     * 创建组件元数据
+     *
+     * @param data - 组件元数据
+     * @returns ComponentMeta 实例或 null
+     *
+     * 功能：
+     * - 创建并注册组件元数据
+     * - 添加到映射表
+     */
     createComponentMeta(data: IPublicTypeComponentMetadata): IComponentMeta | null;
 
-    // 获取组件元数据映射表
+    /**
+     * 获取组件元数据映射表
+     *
+     * @returns Map<组件名, ComponentMeta>
+     *
+     * 用途：
+     * - 遍历所有组件元数据
+     * - 批量操作
+     */
     getComponentMetasMap(): Map<string, IComponentMeta>;
 
-    // 添加属性转换器
+    /**
+     * 添加属性转换器
+     *
+     * @param reducer - 转换器函数
+     * @param stage - 转换阶段
+     *
+     * 功能：
+     * - 注册属性转换器
+     * - 在特定阶段转换属性
+     * - 属性处理管道
+     *
+     * 使用场景：
+     * ```typescript
+     * // 添加转换器
+     * designer.addPropsReducer((props, node) => {
+     *   // 自动添加默认值
+     *   return { ...props, defaultProp: 'value' };
+     * }, TransformStage.Init);
+     * ```
+     */
     addPropsReducer(reducer: IPublicTypePropsTransducer, stage: IPublicEnumTransformStage): void;
 
-    // 🔥 发送事件（设计器事件系统）
+    /**
+     * 发送事件
+     *
+     * @param event - 事件名称
+     * @param args - 事件参数
+     *
+     * 功能：
+     * - 发送设计器事件
+     * - 全局事件总线
+     *
+     * 使用：
+     * ```typescript
+     * designer.postEvent('node.create', node);
+     * designer.postEvent('document.save', document);
+     * ```
+     */
     postEvent(event: string, ...args: any[]): void;
 
-    // 转换属性（属性处理管道）
+    /**
+     * 转换属性
+     *
+     * @param props - 原始属性
+     * @param node - 节点实例
+     * @param stage - 转换阶段
+     * @returns 转换后的属性
+     *
+     * 功能：
+     * - 应用所有注册的转换器
+     * - 按阶段处理属性
+     *
+     * 使用：Node 构造函数中调用
+     */
     transformProps(
         props: IPublicTypeCompositeObject | IPublicTypePropsList,
         node: Node,

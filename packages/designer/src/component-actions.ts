@@ -1,20 +1,101 @@
+/**
+ * @file ComponentActions 组件动作管理
+ * @description 管理组件的通用操作动作（删除、复制、锁定等）
+ *
+ * 核心功能：
+ * 1. 内置动作：提供5个常用的组件操作
+ * 2. 动作管理：添加、删除、修改动作
+ * 3. 条件显示：根据条件决定是否显示动作
+ * 4. 元数据转换：注册元数据转换器
+ *
+ * 内置动作列表：
+ * - remove: 删除节点
+ * - copy: 复制节点
+ * - hide: 隐藏节点（仅模态框）
+ * - lock: 锁定节点
+ * - unlock: 解锁节点
+ *
+ * 使用场景：
+ * - 画布右键菜单
+ * - 大纲树右键菜单
+ * - 工具栏按钮
+ *
+ * @example
+ * ```typescript
+ * // 使用内置动作
+ * componentActions.actions.forEach(action => {
+ *   if (action.condition(node)) {
+ *     // 显示动作
+ *   }
+ * });
+ *
+ * // 添加自定义动作
+ * componentActions.addBuiltinComponentAction({
+ *   name: 'custom',
+ *   content: {
+ *     icon: CustomIcon,
+ *     title: '自定义操作',
+ *     action: (node) => {
+ *       // 自定义逻辑
+ *     }
+ *   }
+ * });
+ * ```
+ */
+
 import { IPublicModelNode, IPublicTypeComponentAction, IPublicTypeMetadataTransducer } from '@alilc/lowcode-types';
 import { engineConfig } from '@alilc/lowcode-editor-core';
 import { intlNode } from './locale';
 import {
-  IconLock,
-  IconUnlock,
-  IconRemove,
-  IconClone,
-  IconHidden,
+  IconLock,  // 锁定图标
+  IconUnlock,  // 解锁图标
+  IconRemove,  // 删除图标
+  IconClone,  // 复制图标
+  IconHidden,  // 隐藏图标
 } from './icons';
-import { componentDefaults, legacyIssues } from './transducers';
+import { componentDefaults, legacyIssues } from './transducers';  // 元数据转换器
 
+// ==================== 辅助函数：去重 ref 属性 ====================
+/**
+ * 递归去重节点的 ref 属性
+ *
+ * @param node - 节点
+ *
+ * 功能：
+ * - 检查节点是否有 ref 属性
+ * - 如果有，生成新的唯一 ref
+ * - 递归处理所有子节点
+ *
+ * 为什么需要去重？
+ * - 复制节点时，ref 会重复
+ * - ref 应该是唯一的
+ * - 避免 React 引用冲突
+ *
+ * ref 生成规则：
+ * ```typescript
+ * // 格式：{组件名小写}-{随机字符串}
+ * button-a1b2c3d
+ * input-x9y8z7w
+ * ```
+ *
+ * 使用场景：
+ * ```typescript
+ * // 复制节点后
+ * const newNode = document.insertNode(parent, node, index, true);
+ * deduplicateRef(newNode);  // 去重 ref
+ * ```
+ */
 function deduplicateRef(node: IPublicModelNode | null | undefined) {
+  // 获取当前 ref
   const currentRef = node?.getPropValue('ref');
+
   if (currentRef) {
+    // 有 ref，生成新的唯一 ref
+    // 格式：{组件名}-{随机ID}
     node?.setPropValue('ref', `${node.componentName.toLowerCase()}-${Math.random().toString(36).slice(2, 9)}`);
   }
+
+  // 递归处理子节点
   node?.children?.forEach(deduplicateRef);
 }
 
